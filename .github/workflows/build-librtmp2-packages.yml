@@ -8,14 +8,13 @@ on:
         required: true
         type: string
   repository_dispatch:
-    types:
-      - librtmp2-release
+    types: [librtmp2-release]
 
 permissions:
   contents: write
 
 concurrency:
-  group: librtmp2-apt-repository
+  group: librtmp2-package-repository
   cancel-in-progress: false
 
 env:
@@ -35,7 +34,6 @@ jobs:
           - { codename: bookworm, image: "debian:12", architecture: i386, platform: "linux/386" }
           - { codename: bookworm, image: "debian:12", architecture: ppc64el, platform: "linux/ppc64le" }
           - { codename: bookworm, image: "debian:12", architecture: s390x, platform: "linux/s390x" }
-
           - { codename: trixie, image: "debian:13", architecture: amd64, platform: "linux/amd64" }
           - { codename: trixie, image: "debian:13", architecture: arm64, platform: "linux/arm64" }
           - { codename: trixie, image: "debian:13", architecture: armhf, platform: "linux/arm/v7" }
@@ -43,21 +41,18 @@ jobs:
           - { codename: trixie, image: "debian:13", architecture: ppc64el, platform: "linux/ppc64le" }
           - { codename: trixie, image: "debian:13", architecture: riscv64, platform: "linux/riscv64" }
           - { codename: trixie, image: "debian:13", architecture: s390x, platform: "linux/s390x" }
-
           - { codename: jammy, image: "ubuntu:22.04", architecture: amd64, platform: "linux/amd64" }
           - { codename: jammy, image: "ubuntu:22.04", architecture: arm64, platform: "linux/arm64" }
           - { codename: jammy, image: "ubuntu:22.04", architecture: armhf, platform: "linux/arm/v7" }
           - { codename: jammy, image: "ubuntu:22.04", architecture: ppc64el, platform: "linux/ppc64le" }
           - { codename: jammy, image: "ubuntu:22.04", architecture: riscv64, platform: "linux/riscv64" }
           - { codename: jammy, image: "ubuntu:22.04", architecture: s390x, platform: "linux/s390x" }
-
           - { codename: noble, image: "ubuntu:24.04", architecture: amd64, platform: "linux/amd64" }
           - { codename: noble, image: "ubuntu:24.04", architecture: arm64, platform: "linux/arm64" }
           - { codename: noble, image: "ubuntu:24.04", architecture: armhf, platform: "linux/arm/v7" }
           - { codename: noble, image: "ubuntu:24.04", architecture: ppc64el, platform: "linux/ppc64le" }
           - { codename: noble, image: "ubuntu:24.04", architecture: riscv64, platform: "linux/riscv64" }
           - { codename: noble, image: "ubuntu:24.04", architecture: s390x, platform: "linux/s390x" }
-
           - { codename: resolute, image: "ubuntu:26.04", architecture: amd64, platform: "linux/amd64" }
           - { codename: resolute, image: "ubuntu:26.04", architecture: arm64, platform: "linux/arm64" }
           - { codename: resolute, image: "ubuntu:26.04", architecture: armhf, platform: "linux/arm/v7" }
@@ -66,11 +61,8 @@ jobs:
           - { codename: resolute, image: "ubuntu:26.04", architecture: s390x, platform: "linux/s390x" }
 
     steps:
-      - name: Checkout package repository
-        uses: actions/checkout@v4
-
-      - name: Enable QEMU architectures
-        uses: docker/setup-qemu-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
@@ -78,14 +70,10 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [[ -z "${RAW_VERSION}" ]]; then
-            echo "No librtmp2 version was supplied." >&2
-            exit 1
-          fi
-          VERSION="${RAW_VERSION#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          test -n "${RAW_VERSION}" || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Build Debian packages
+      - name: Build packages
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -95,16 +83,10 @@ jobs:
           EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           mkdir -p output
-          docker run --rm \
-            --platform "$PLATFORM" \
-            -e VERSION \
-            -e CODENAME \
-            -e EXPECTED_ARCHITECTURE \
-            -e SOURCE_DIR=/workspace/librtmp2 \
-            -e OUTPUT_DIR=/workspace/output \
-            -v "$GITHUB_WORKSPACE:/workspace" \
-            -w /workspace \
-            "$IMAGE" \
+          docker run --rm --platform "$PLATFORM" \
+            -e VERSION -e CODENAME -e EXPECTED_ARCHITECTURE \
+            -e SOURCE_DIR=/workspace/librtmp2 -e OUTPUT_DIR=/workspace/output \
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
             bash -euxo pipefail -c '
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -112,29 +94,25 @@ jobs:
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
                 | sh -s -- -y --profile minimal --default-toolchain 1.93.0
               export PATH="$HOME/.cargo/bin:$PATH"
-              actual_architecture="$(dpkg --print-architecture)"
-              test "$actual_architecture" = "$EXPECTED_ARCHITECTURE"
+              test "$(dpkg --print-architecture)" = "$EXPECTED_ARCHITECTURE"
               git clone --depth 1 --branch "v$VERSION" \
                 https://github.com/OpenRTMP/librtmp2.git "$SOURCE_DIR"
               chmod +x scripts/build-librtmp2-deb.sh
               scripts/build-librtmp2-deb.sh
             '
 
-      - name: Upload packages
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: librtmp2-${{ matrix.codename }}-${{ matrix.architecture }}
           path: output/*.deb
           if-no-files-found: error
 
   publish:
-    name: Update APT repository
+    name: Update Debian and Ubuntu repositories
     needs: build
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout package repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: main
 
@@ -143,61 +121,58 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y apt-utils dpkg-dev gnupg
 
-      - name: Download packages
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           pattern: librtmp2-*
           path: downloaded-packages
           merge-multiple: true
 
-      - name: Add packages to pool
+      - name: Sort packages into distribution pools
+        shell: bash
         run: |
-          mkdir -p pool/main/l/librtmp2
-          find downloaded-packages -type f -name '*.deb' \
-            -exec cp {} pool/main/l/librtmp2/ \;
+          mkdir -p debian/pool/main/l/librtmp2 ubuntu/pool/main/l/librtmp2
+          find downloaded-packages -type f -name '*.deb' -print0 | while IFS= read -r -d '' package; do
+            filename="$(basename "$package")"
+            case "$filename" in
+              *+bookworm1_*|*+trixie1_*) destination=debian ;;
+              *+jammy1_*|*+noble1_*|*+resolute1_*) destination=ubuntu ;;
+              *) echo "Unknown package distribution: $filename" >&2; exit 1 ;;
+            esac
+            cp "$package" "$destination/pool/main/l/librtmp2/"
+          done
 
-      - name: Generate repository metadata
+      - name: Generate APT metadata
         run: |
           chmod +x scripts/generate-apt-repository.sh
-          scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE"
+          scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/debian" bookworm trixie
+          scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/ubuntu" jammy noble resolute
 
       - name: Import signing key
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        shell: bash
         run: |
-          if [[ -z "$APT_GPG_PRIVATE_KEY" ]]; then
-            echo "Repository secret APT_GPG_PRIVATE_KEY is required." >&2
-            exit 1
-          fi
+          test -n "$APT_GPG_PRIVATE_KEY" || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
           printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
-          KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys \
-            | awk -F: '$1 == "fpr" { print $10; exit }')"
-          if [[ -z "$KEY_FINGERPRINT" ]]; then
-            echo "No GPG signing key could be imported." >&2
-            exit 1
-          fi
+          KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          test -n "$KEY_FINGERPRINT"
           echo "KEY_FINGERPRINT=$KEY_FINGERPRINT" >> "$GITHUB_ENV"
           gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
           gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
 
-      - name: Sign repository metadata
+      - name: Sign Debian and Ubuntu metadata
         env:
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        shell: bash
         run: |
-          for codename in bookworm trixie jammy noble resolute; do
-            release="dists/$codename/Release"
+          for release in debian/dists/{bookworm,trixie}/Release ubuntu/dists/{jammy,noble,resolute}/Release; do
+            directory="$(dirname "$release")"
             gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "$APT_GPG_PASSPHRASE" \
-              --local-user "$KEY_FINGERPRINT" \
-              --clearsign \
-              --output "dists/$codename/InRelease" \
-              "$release"
+              --passphrase "$APT_GPG_PASSPHRASE" --local-user "$KEY_FINGERPRINT" \
+              --clearsign --output "$directory/InRelease" "$release"
             gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "$APT_GPG_PASSPHRASE" \
-              --local-user "$KEY_FINGERPRINT" \
-              --armor --detach-sign \
-              --output "dists/$codename/Release.gpg" \
-              "$release"
+              --passphrase "$APT_GPG_PASSPHRASE" --local-user "$KEY_FINGERPRINT" \
+              --armor --detach-sign --output "$directory/Release.gpg" "$release"
           done
 
       - name: Commit repository update
@@ -206,10 +181,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dists pool openrtmp.asc openrtmp.gpg
+          git add debian ubuntu openrtmp.asc openrtmp.gpg
           if git diff --cached --quiet; then
-            echo "APT repository is already up to date."
+            echo "Package repositories are already up to date."
             exit 0
           fi
-          git commit -m "Publish librtmp2 ${VERSION#v} packages"
+          git commit -m "Publish librtmp2 ${VERSION#v} Debian and Ubuntu packages"
           git push origin main
