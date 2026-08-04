@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="${1:-$PWD}"
-POOL_DIR="$ROOT_DIR/pool/main/l/librtmp2"
-DIST_DIR="$ROOT_DIR/dists"
-CODENAMES=(bookworm trixie jammy noble resolute)
+REPOSITORY_DIR="${1:?repository directory is required}"
+shift
+
+if [[ $# -eq 0 ]]; then
+    echo "At least one codename is required." >&2
+    exit 1
+fi
+
+CODENAMES=("$@")
+POOL_DIR="$REPOSITORY_DIR/pool/main/l/librtmp2"
+DIST_DIR="$REPOSITORY_DIR/dists"
 ARCHITECTURES=(amd64 arm64 armhf i386 ppc64el riscv64 s390x)
 
 mkdir -p "$POOL_DIR" "$DIST_DIR"
@@ -27,17 +34,21 @@ for codename in "${CODENAMES[@]}"; do
                 > "$binary_dir/Packages"
             available_architectures+=("$architecture")
         else
-            : > "$binary_dir/Packages"
+            rm -rf "$binary_dir"
         fi
 
-        gzip -9c "$binary_dir/Packages" > "$binary_dir/Packages.gz"
         rm -rf "$temp_dir"
     done
 
     if [[ ${#available_architectures[@]} -eq 0 ]]; then
-        echo "No packages found for $codename." >&2
+        echo "No packages found for $codename in $REPOSITORY_DIR." >&2
         exit 1
     fi
+
+    find "$DIST_DIR/$codename" -type f -name Packages -exec gzip -9cf {} \; >/dev/null
+    for packages_file in "$DIST_DIR/$codename"/main/binary-*/Packages; do
+        gzip -9c "$packages_file" > "$packages_file.gz"
+    done
 
     release_tmp="$(mktemp)"
     apt-ftparchive release "$DIST_DIR/$codename" > "$release_tmp"
