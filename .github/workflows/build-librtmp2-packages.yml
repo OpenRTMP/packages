@@ -23,38 +23,56 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.codename }} / amd64
+    name: ${{ matrix.codename }} / ${{ matrix.architecture }}
     runs-on: ubuntu-latest
-    container: ${{ matrix.container }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - codename: bookworm
-            container: debian:12
-          - codename: trixie
-            container: debian:13
-          - codename: jammy
-            container: ubuntu:22.04
-          - codename: noble
-            container: ubuntu:24.04
+          - { codename: bookworm, image: "debian:12", architecture: amd64, platform: "linux/amd64" }
+          - { codename: bookworm, image: "debian:12", architecture: arm64, platform: "linux/arm64" }
+          - { codename: bookworm, image: "debian:12", architecture: armhf, platform: "linux/arm/v7" }
+          - { codename: bookworm, image: "debian:12", architecture: i386, platform: "linux/386" }
+          - { codename: bookworm, image: "debian:12", architecture: ppc64el, platform: "linux/ppc64le" }
+          - { codename: bookworm, image: "debian:12", architecture: s390x, platform: "linux/s390x" }
+
+          - { codename: trixie, image: "debian:13", architecture: amd64, platform: "linux/amd64" }
+          - { codename: trixie, image: "debian:13", architecture: arm64, platform: "linux/arm64" }
+          - { codename: trixie, image: "debian:13", architecture: armhf, platform: "linux/arm/v7" }
+          - { codename: trixie, image: "debian:13", architecture: i386, platform: "linux/386" }
+          - { codename: trixie, image: "debian:13", architecture: ppc64el, platform: "linux/ppc64le" }
+          - { codename: trixie, image: "debian:13", architecture: riscv64, platform: "linux/riscv64" }
+          - { codename: trixie, image: "debian:13", architecture: s390x, platform: "linux/s390x" }
+
+          - { codename: jammy, image: "ubuntu:22.04", architecture: amd64, platform: "linux/amd64" }
+          - { codename: jammy, image: "ubuntu:22.04", architecture: arm64, platform: "linux/arm64" }
+          - { codename: jammy, image: "ubuntu:22.04", architecture: armhf, platform: "linux/arm/v7" }
+          - { codename: jammy, image: "ubuntu:22.04", architecture: ppc64el, platform: "linux/ppc64le" }
+          - { codename: jammy, image: "ubuntu:22.04", architecture: riscv64, platform: "linux/riscv64" }
+          - { codename: jammy, image: "ubuntu:22.04", architecture: s390x, platform: "linux/s390x" }
+
+          - { codename: noble, image: "ubuntu:24.04", architecture: amd64, platform: "linux/amd64" }
+          - { codename: noble, image: "ubuntu:24.04", architecture: arm64, platform: "linux/arm64" }
+          - { codename: noble, image: "ubuntu:24.04", architecture: armhf, platform: "linux/arm/v7" }
+          - { codename: noble, image: "ubuntu:24.04", architecture: ppc64el, platform: "linux/ppc64le" }
+          - { codename: noble, image: "ubuntu:24.04", architecture: riscv64, platform: "linux/riscv64" }
+          - { codename: noble, image: "ubuntu:24.04", architecture: s390x, platform: "linux/s390x" }
+
+          - { codename: resolute, image: "ubuntu:26.04", architecture: amd64, platform: "linux/amd64" }
+          - { codename: resolute, image: "ubuntu:26.04", architecture: arm64, platform: "linux/arm64" }
+          - { codename: resolute, image: "ubuntu:26.04", architecture: armhf, platform: "linux/arm/v7" }
+          - { codename: resolute, image: "ubuntu:26.04", architecture: ppc64el, platform: "linux/ppc64le" }
+          - { codename: resolute, image: "ubuntu:26.04", architecture: riscv64, platform: "linux/riscv64" }
+          - { codename: resolute, image: "ubuntu:26.04", architecture: s390x, platform: "linux/s390x" }
 
     steps:
-      - name: Install system dependencies
-        shell: bash
-        run: |
-          apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential \
-            ca-certificates \
-            curl \
-            dpkg-dev \
-            git \
-            libssl-dev \
-            pkg-config
-
       - name: Checkout package repository
         uses: actions/checkout@v4
+
+      - name: Enable QEMU architectures
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
 
       - name: Resolve version
         id: version
@@ -67,35 +85,45 @@ jobs:
           VERSION="${RAW_VERSION#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Install Rust
-        shell: bash
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-            | sh -s -- -y --profile minimal --default-toolchain 1.93.0
-          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
-
-      - name: Checkout librtmp2 release
-        shell: bash
-        run: |
-          git clone --depth 1 --branch "v${{ steps.version.outputs.version }}" \
-            https://github.com/OpenRTMP/librtmp2.git librtmp2
-
       - name: Build Debian packages
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
           CODENAME: ${{ matrix.codename }}
-          SOURCE_DIR: ${{ github.workspace }}/librtmp2
-          OUTPUT_DIR: ${{ github.workspace }}/output
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
         run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          chmod +x scripts/build-librtmp2-deb.sh
-          scripts/build-librtmp2-deb.sh
+          mkdir -p output
+          docker run --rm \
+            --platform "$PLATFORM" \
+            -e VERSION \
+            -e CODENAME \
+            -e EXPECTED_ARCHITECTURE \
+            -e SOURCE_DIR=/workspace/librtmp2 \
+            -e OUTPUT_DIR=/workspace/output \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "$IMAGE" \
+            bash -euxo pipefail -c '
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
+                | sh -s -- -y --profile minimal --default-toolchain 1.93.0
+              export PATH="$HOME/.cargo/bin:$PATH"
+              actual_architecture="$(dpkg --print-architecture)"
+              test "$actual_architecture" = "$EXPECTED_ARCHITECTURE"
+              git clone --depth 1 --branch "v$VERSION" \
+                https://github.com/OpenRTMP/librtmp2.git "$SOURCE_DIR"
+              chmod +x scripts/build-librtmp2-deb.sh
+              scripts/build-librtmp2-deb.sh
+            '
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: librtmp2-${{ matrix.codename }}-amd64
+          name: librtmp2-${{ matrix.codename }}-${{ matrix.architecture }}
           path: output/*.deb
           if-no-files-found: error
 
@@ -118,7 +146,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
-          pattern: librtmp2-*-amd64
+          pattern: librtmp2-*
           path: downloaded-packages
           merge-multiple: true
 
@@ -156,7 +184,7 @@ jobs:
         env:
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
         run: |
-          for codename in bookworm trixie jammy noble; do
+          for codename in bookworm trixie jammy noble resolute; do
             release="dists/$codename/Release"
             gpg --batch --yes --pinentry-mode loopback \
               --passphrase "$APT_GPG_PASSPHRASE" \
