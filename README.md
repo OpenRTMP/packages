@@ -1,6 +1,6 @@
 # OpenRTMP packages
 
-This repository stores the OpenRTMP APT repository directly at repository root.
+This repository stores the OpenRTMP APT and Alpine APK repositories directly in the repository.
 
 ```text
 .
@@ -9,13 +9,19 @@ This repository stores the OpenRTMP APT repository directly at repository root.
 │   └── main/
 │       └── l/
 │           └── librtmp2/
+├── alpine/
+│   └── v3.24/
+│       └── main/
+│           └── x86_64/
 ├── scripts/
 └── .github/workflows/
 ```
 
-`dists` is the standard Debian APT directory name. The workflow does not create an additional `repo/` or `repository/` directory.
+`dists` and `pool` are the standard Debian APT directories. Alpine packages and indexes are stored below `alpine/<branch>/main/<architecture>/`. No additional `repo/` or `repository/` wrapper directory is used.
 
-## Supported distributions
+## Debian and Ubuntu
+
+Supported distributions:
 
 - Debian 12 (`bookworm`)
 - Debian 13 (`trixie`)
@@ -23,7 +29,7 @@ This repository stores the OpenRTMP APT repository directly at repository root.
 - Ubuntu 24.04 LTS (`noble`)
 - Ubuntu 26.04 LTS (`resolute`)
 
-## Supported architectures
+Supported architectures:
 
 - `amd64`
 - `arm64`
@@ -31,39 +37,62 @@ This repository stores the OpenRTMP APT repository directly at repository root.
 - `ppc64el`
 - `riscv64`
 - `s390x`
-- `i386` for Debian, where an official distribution image is available
+- `i386` for Debian where an official distribution image is available
 
-The workflow uses QEMU-backed native distribution containers so the package is built and linked against the libraries of the selected distribution and architecture rather than merely relabeling one binary.
-
-## Packages
+The APT workflow creates:
 
 - `librtmp2`: shared runtime library
 - `librtmp2-dev`: C header, static library, and pkg-config metadata
 
+## Alpine Linux
+
+Supported Alpine branches:
+
+- Alpine 3.21 (`v3.21`)
+- Alpine 3.22 (`v3.22`)
+- Alpine 3.23 (`v3.23`)
+- Alpine 3.24 (`v3.24`)
+
+Supported Alpine architectures:
+
+- `x86_64`
+- `x86`
+- `aarch64`
+- `armv7`
+- `ppc64le`
+- `riscv64`
+- `s390x`
+
+The Alpine workflow creates:
+
+- `librtmp2`: shared runtime library
+- `librtmp2-dev`: C header, shared-library link, and pkg-config metadata
+- `librtmp2-static`: static library
+
+Each `APKINDEX.tar.gz` and every `.apk` package is signed with the configured Alpine RSA key.
+
 ## Required repository secrets
 
-Before running the workflow, add these GitHub Actions repository secrets:
+APT repository:
 
-- `APT_GPG_PRIVATE_KEY`: ASCII-armored private GPG key used to sign the repository
-- `APT_GPG_PASSPHRASE`: passphrase of that key; use an empty secret only when the key has no passphrase
+- `APT_GPG_PRIVATE_KEY`
+- `APT_GPG_PASSPHRASE`
 
-The workflow exports the corresponding public key to both `openrtmp.asc` and `openrtmp.gpg`.
+Alpine repository:
+
+- `ALPINE_RSA_PRIVATE_KEY`
+- `ALPINE_RSA_PUBLIC_KEY`
+
+The public keys are published as `openrtmp.gpg`, `openrtmp.asc`, and `openrtmp-alpine.rsa.pub`.
 
 ## Publishing a librtmp2 version
 
-Open **Actions → Build librtmp2 APT packages → Run workflow** and enter a released librtmp2 version such as `0.6.0` or `v0.6.0`.
+Run either workflow and enter a released version such as `0.6.0` or `v0.6.0`:
 
-The workflow:
+- **Build librtmp2 APT packages**
+- **Build librtmp2 Alpine packages**
 
-1. checks out the matching `OpenRTMP/librtmp2` release tag;
-2. builds separate packages in Debian and Ubuntu containers for every supported architecture;
-3. creates `librtmp2` and `librtmp2-dev` packages;
-4. copies the `.deb` files into `pool/main/l/librtmp2/`;
-5. regenerates every `dists/<codename>/main/binary-<architecture>/Packages` index and the release metadata;
-6. signs each distribution using the configured GPG key;
-7. commits the updated APT repository to `main`.
-
-It can also be triggered with a `repository_dispatch` event of type `librtmp2-release` and this payload:
+Both workflows also accept a `repository_dispatch` event of type `librtmp2-release` with this payload:
 
 ```json
 {
@@ -74,9 +103,7 @@ It can also be triggered with a `repository_dispatch` event of type `librtmp2-re
 }
 ```
 
-## Client configuration
-
-After this repository is published through GitHub Pages or another static web server, users can install its signing key and source entry.
+## APT client configuration
 
 Example for Debian 12:
 
@@ -89,4 +116,19 @@ echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp
 
 sudo apt update
 sudo apt install librtmp2 librtmp2-dev
+```
+
+## Alpine client configuration
+
+Example for Alpine 3.24:
+
+```sh
+wget -O /etc/apk/keys/openrtmp-alpine.rsa.pub \
+  https://packages.openrtmp.org/openrtmp-alpine.rsa.pub
+
+echo "https://packages.openrtmp.org/alpine/v3.24/main" \
+  >> /etc/apk/repositories
+
+apk update
+apk add librtmp2 librtmp2-dev
 ```
