@@ -130,7 +130,7 @@ jobs:
           ref: main
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: librtmp2-alpine-*
           path: downloaded-alpine
