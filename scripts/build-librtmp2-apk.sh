@@ -13,12 +13,10 @@ cd "$WORK_DIR"
 
 current_rust_version="$(rustc --version | awk '{print $2}')"
 if [[ "$(apk version -t "$current_rust_version" "$REQUIRED_RUST_VERSION")" = "<" ]]; then
-    echo "Alpine provides Rust $current_rust_version; installing Rust $REQUIRED_RUST_VERSION with rustup."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-        | sh -s -- -y --profile minimal --default-toolchain "$REQUIRED_RUST_VERSION"
+    echo "Rust $REQUIRED_RUST_VERSION or newer is required; found $current_rust_version." >&2
+    exit 1
 fi
 
-export PATH="$HOME/.cargo/bin:$PATH"
 rustc --version
 cargo --version
 
@@ -42,7 +40,7 @@ prepare() {
     if [ ! -f include/librtmp2/librtmp2.h ]; then
         cargo install --locked cbindgen
         mkdir -p include/librtmp2
-        \$HOME/.cargo/bin/cbindgen \\
+        cbindgen \\
             --config cbindgen.toml \\
             --crate librtmp2 \\
             --output include/librtmp2/librtmp2.h
