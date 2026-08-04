@@ -1,0 +1,195 @@
+name: Build librtmp2 Alpine packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: librtmp2 release version, for example 0.6.0 or v0.6.0
+        required: true
+        type: string
+  repository_dispatch:
+    types:
+      - librtmp2-release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: librtmp2-alpine-repository
+  cancel-in-progress: false
+
+env:
+  RAW_VERSION: ${{ inputs.version || github.event.client_payload.version }}
+
+jobs:
+  build:
+    name: Alpine ${{ matrix.branch }} / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: [v3.21, v3.22, v3.23, v3.24]
+        include:
+          - arch: x86_64
+            platform: linux/amd64
+          - arch: x86
+            platform: linux/386
+          - arch: aarch64
+            platform: linux/arm64
+          - arch: armv7
+            platform: linux/arm/v7
+          - arch: ppc64le
+            platform: linux/ppc64le
+          - arch: riscv64
+            platform: linux/riscv64
+          - arch: s390x
+            platform: linux/s390x
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ -z "${RAW_VERSION}" ]]; then
+            echo "No librtmp2 version was supplied." >&2
+            exit 1
+          fi
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Alpine signing key
+        shell: bash
+        env:
+          ALPINE_RSA_PRIVATE_KEY: ${{ secrets.ALPINE_RSA_PRIVATE_KEY }}
+          ALPINE_RSA_PUBLIC_KEY: ${{ secrets.ALPINE_RSA_PUBLIC_KEY }}
+        run: |
+          if [[ -z "$ALPINE_RSA_PRIVATE_KEY" || -z "$ALPINE_RSA_PUBLIC_KEY" ]]; then
+            echo "ALPINE_RSA_PRIVATE_KEY and ALPINE_RSA_PUBLIC_KEY are required." >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/alpine-keys"
+          printf '%s\n' "$ALPINE_RSA_PRIVATE_KEY" > "$RUNNER_TEMP/alpine-keys/openrtmp-alpine.rsa"
+          printf '%s\n' "$ALPINE_RSA_PUBLIC_KEY" > "$RUNNER_TEMP/alpine-keys/openrtmp-alpine.rsa.pub"
+          chmod 600 "$RUNNER_TEMP/alpine-keys/openrtmp-alpine.rsa"
+
+      - name: Build APK packages
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          output="$GITHUB_WORKSPACE/output/${{ matrix.branch }}/main/${{ matrix.arch }}"
+          mkdir -p "$output"
+          chmod +x scripts/build-librtmp2-apk.sh
+
+          docker run --rm \
+            --platform "${{ matrix.platform }}" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -v "$RUNNER_TEMP/alpine-keys:/keys:ro" \
+            -e VERSION="$VERSION" \
+            -e ALPINE_BRANCH="${{ matrix.branch }}" \
+            -e OUTPUT_DIR="/workspace/output/${{ matrix.branch }}/main/${{ matrix.arch }}" \
+            "alpine:${{ matrix.branch#v }}" \
+            /bin/sh -euxc '
+              apk add --no-cache alpine-sdk bash curl git openssl-dev pkgconf sudo
+              adduser -D builder
+              addgroup builder abuild
+              echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+              mkdir -p /home/builder/.abuild
+              cp /keys/openrtmp-alpine.rsa /home/builder/.abuild/openrtmp-alpine.rsa
+              cp /keys/openrtmp-alpine.rsa.pub /home/builder/.abuild/openrtmp-alpine.rsa.pub
+              cp /keys/openrtmp-alpine.rsa.pub /etc/apk/keys/openrtmp-alpine.rsa.pub
+              cat > /home/builder/.abuild/abuild.conf <<CONF
+PACKAGER="OpenRTMP <info@openrtmp.org>"
+PACKAGER_PRIVKEY="/home/builder/.abuild/openrtmp-alpine.rsa"
+CONF
+              chown -R builder:builder /home/builder /workspace/output
+              su builder -c "VERSION=$VERSION ALPINE_BRANCH=${{ matrix.branch }} OUTPUT_DIR=/workspace/output/${{ matrix.branch }}/main/${{ matrix.arch }} WORK_DIR=/home/builder/apk-work /workspace/scripts/build-librtmp2-apk.sh"
+            '
+
+      - name: Upload APK packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: librtmp2-alpine-${{ matrix.branch }}-${{ matrix.arch }}
+          path: output/${{ matrix.branch }}/main/${{ matrix.arch }}/*.apk
+          if-no-files-found: error
+
+  publish:
+    name: Update Alpine repository
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: librtmp2-alpine-*
+          path: downloaded-alpine
+
+      - name: Install Alpine repository tools
+        run: |
+          docker pull alpine:3.24
+
+      - name: Prepare repository files
+        shell: bash
+        env:
+          ALPINE_RSA_PRIVATE_KEY: ${{ secrets.ALPINE_RSA_PRIVATE_KEY }}
+          ALPINE_RSA_PUBLIC_KEY: ${{ secrets.ALPINE_RSA_PUBLIC_KEY }}
+        run: |
+          if [[ -z "$ALPINE_RSA_PRIVATE_KEY" || -z "$ALPINE_RSA_PUBLIC_KEY" ]]; then
+            echo "ALPINE_RSA_PRIVATE_KEY and ALPINE_RSA_PUBLIC_KEY are required." >&2
+            exit 1
+          fi
+
+          find downloaded-alpine -type f -name '*.apk' | while read -r package; do
+            relative="${package#downloaded-alpine/}"
+            artifact="${relative%%/*}"
+            branch="$(printf '%s' "$artifact" | sed -E 's/^librtmp2-alpine-(v3\.[0-9]+)-.*/\1/')"
+            arch="${artifact##*-}"
+            destination="alpine/$branch/main/$arch"
+            mkdir -p "$destination"
+            cp "$package" "$destination/"
+          done
+
+          mkdir -p "$RUNNER_TEMP/alpine-keys"
+          printf '%s\n' "$ALPINE_RSA_PRIVATE_KEY" > "$RUNNER_TEMP/alpine-keys/openrtmp-alpine.rsa"
+          printf '%s\n' "$ALPINE_RSA_PUBLIC_KEY" > openrtmp-alpine.rsa.pub
+          chmod 600 "$RUNNER_TEMP/alpine-keys/openrtmp-alpine.rsa"
+
+      - name: Generate and sign APK indexes
+        run: |
+          chmod +x scripts/generate-apk-repository.sh
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo" \
+            -v "$RUNNER_TEMP/alpine-keys:/keys:ro" \
+            alpine:3.24 \
+            /bin/sh -euxc '
+              apk add --no-cache alpine-sdk bash
+              ALPINE_PRIVATE_KEY_PATH=/keys/openrtmp-alpine.rsa \
+                /repo/scripts/generate-apk-repository.sh /repo
+            '
+
+      - name: Commit repository update
+        env:
+          VERSION: ${{ env.RAW_VERSION }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add alpine openrtmp-alpine.rsa.pub
+          if git diff --cached --quiet; then
+            echo "Alpine repository is already up to date."
+            exit 0
+          fi
+          git commit -m "Publish librtmp2 ${VERSION#v} Alpine packages"
+          git push origin main
