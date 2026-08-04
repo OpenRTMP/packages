@@ -149,7 +149,7 @@ CONF
             exit 1
           fi
 
-          find downloaded-alpine -type f -name '*.apk' | while read -r package; do
+          find downloaded-alpine -mindepth 2 -type f -name '*.apk' | while read -r package; do
             relative="${package#downloaded-alpine/}"
             artifact="${relative%%/*}"
             branch="$(printf '%s' "$artifact" | sed -E 's/^librtmp2-alpine-(v3\.[0-9]+)-.*/\1/')"
