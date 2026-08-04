@@ -16,8 +16,6 @@ This repository contains separate Debian, Ubuntu, and Alpine package repositorie
 └── .github/workflows/
 ```
 
-There is no additional `repo/` or `repository/` wrapper directory.
-
 ## Debian repository
 
 Supported releases:
