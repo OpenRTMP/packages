@@ -40,7 +40,7 @@ prepare() {
     if [ ! -f include/librtmp2/librtmp2.h ]; then
         cargo install --locked cbindgen
         mkdir -p include/librtmp2
-        cbindgen \\
+        \$HOME/.cargo/bin/cbindgen \\
             --config cbindgen.toml \\
             --crate librtmp2 \\
             --output include/librtmp2/librtmp2.h
