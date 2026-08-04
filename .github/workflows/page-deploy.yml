@@ -1,0 +1,201 @@
+name: Deploy package repositories to Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare package repository
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p public
+
+          for item in \
+            debian \
+            ubuntu \
+            alpine \
+            openrtmp.gpg \
+            openrtmp-alpine.rsa.pub
+          do
+            if [[ -e "$item" ]]; then
+              cp -a "$item" public/
+            fi
+          done
+
+      - name: Generate directory indexes
+        shell: python
+        run: |
+          from pathlib import Path
+          from urllib.parse import quote
+          from html import escape
+          from datetime import datetime
+
+          root = Path("public")
+
+          css = """
+          body {
+              max-width: 1100px;
+              margin: 40px auto;
+              padding: 0 20px;
+              font-family: system-ui, sans-serif;
+              color: #222;
+          }
+          h1 {
+              font-size: 1.5rem;
+          }
+          table {
+              width: 100%;
+              border-collapse: collapse;
+          }
+          th, td {
+              padding: 10px;
+              border-bottom: 1px solid #ddd;
+              text-align: left;
+          }
+          th {
+              background: #f5f5f5;
+          }
+          a {
+              color: #0969da;
+              text-decoration: none;
+          }
+          a:hover {
+              text-decoration: underline;
+          }
+          .size, .date {
+              white-space: nowrap;
+          }
+          """
+
+          def format_size(size: int) -> str:
+              units = ["B", "KiB", "MiB", "GiB", "TiB"]
+              value = float(size)
+
+              for unit in units:
+                  if value < 1024 or unit == units[-1]:
+                      return f"{value:.1f} {unit}"
+
+                  value /= 1024
+
+              return f"{size} B"
+
+          directories = sorted(
+              [root, *root.rglob("*")],
+              key=lambda path: len(path.parts),
+              reverse=True,
+          )
+
+          for directory in directories:
+              if not directory.is_dir():
+                  continue
+
+              relative = directory.relative_to(root)
+              display_path = "/" if relative == Path(".") else f"/{relative.as_posix()}/"
+
+              rows = []
+
+              if directory != root:
+                  rows.append(
+                      """
+                      <tr>
+                        <td><a href="../">../</a></td>
+                        <td class="size">—</td>
+                        <td class="date">—</td>
+                      </tr>
+                      """
+                  )
+
+              entries = sorted(
+                  (
+                      entry
+                      for entry in directory.iterdir()
+                      if entry.name != "index.html"
+                  ),
+                  key=lambda entry: (not entry.is_dir(), entry.name.lower()),
+              )
+
+              for entry in entries:
+                  stat = entry.stat()
+                  name = f"{entry.name}/" if entry.is_dir() else entry.name
+                  href = quote(entry.name) + ("/" if entry.is_dir() else "")
+                  size = "—" if entry.is_dir() else format_size(stat.st_size)
+                  modified = datetime.fromtimestamp(
+                      stat.st_mtime
+                  ).strftime("%Y-%m-%d %H:%M:%S")
+
+                  rows.append(
+                      f"""
+                      <tr>
+                        <td><a href="{href}">{escape(name)}</a></td>
+                        <td class="size">{escape(size)}</td>
+                        <td class="date">{escape(modified)}</td>
+                      </tr>
+                      """
+                  )
+
+              html = f"""<!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Index of {escape(display_path)}</title>
+            <style>{css}</style>
+          </head>
+          <body>
+            <h1>Index of {escape(display_path)}</h1>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Size</th>
+                  <th>Last modified</th>
+                </tr>
+              </thead>
+              <tbody>
+                {''.join(rows)}
+              </tbody>
+            </table>
+          </body>
+          </html>
+          """
+
+              (directory / "index.html").write_text(
+                  html,
+                  encoding="utf-8",
+              )
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
