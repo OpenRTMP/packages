@@ -32,6 +32,7 @@ for codename in "${CODENAMES[@]}"; do
             dpkg-scanpackages --multiversion "$temp_dir" /dev/null \
                 | sed "s#Filename: $temp_dir/#Filename: pool/main/l/librtmp2/#" \
                 > "$binary_dir/Packages"
+            gzip -9c "$binary_dir/Packages" > "$binary_dir/Packages.gz"
             available_architectures+=("$architecture")
         else
             rm -rf "$binary_dir"
@@ -44,11 +45,6 @@ for codename in "${CODENAMES[@]}"; do
         echo "No packages found for $codename in $REPOSITORY_DIR." >&2
         exit 1
     fi
-
-    find "$DIST_DIR/$codename" -type f -name Packages -exec gzip -9cf {} \; >/dev/null
-    for packages_file in "$DIST_DIR/$codename"/main/binary-*/Packages; do
-        gzip -9c "$packages_file" > "$packages_file.gz"
-    done
 
     release_tmp="$(mktemp)"
     apt-ftparchive release "$DIST_DIR/$codename" > "$release_tmp"
