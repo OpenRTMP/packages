@@ -83,7 +83,7 @@ Alpine repository:
 - `ALPINE_RSA_PRIVATE_KEY`
 - `ALPINE_RSA_PUBLIC_KEY`
 
-The public keys are published as `openrtmp.gpg`, `openrtmp.asc`, and `openrtmp-alpine.rsa.pub`.
+Generate the Alpine key pair once with `abuild-keygen`, then store the complete private and public key contents in those secrets. The public keys are published as `openrtmp.gpg`, `openrtmp.asc`, and `openrtmp-alpine.rsa.pub`.
 
 ## Publishing a librtmp2 version
 
