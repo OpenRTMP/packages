@@ -27,8 +27,6 @@ Supported releases:
 
 Supported architectures include `amd64`, `arm64`, `armhf`, `i386`, `ppc64el`, `riscv64`, and `s390x` where the selected release provides an official container image.
 
-Example source:
-
 ```bash
 echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp.org/debian bookworm main" \
   | sudo tee /etc/apt/sources.list.d/openrtmp.list
@@ -43,8 +41,6 @@ Supported releases:
 - Ubuntu 26.04 LTS (`resolute`)
 
 Supported architectures are `amd64`, `arm64`, `armhf`, `ppc64el`, `riscv64`, and `s390x`.
-
-Example source:
 
 ```bash
 echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp.org/ubuntu noble main" \
@@ -72,8 +68,6 @@ Supported branches:
 
 Supported architectures are `x86_64`, `x86`, `aarch64`, `armv7`, `ppc64le`, `riscv64`, and `s390x`.
 
-Example configuration:
-
 ```sh
 wget -O /etc/apk/keys/openrtmp-alpine.rsa.pub \
   https://packages.openrtmp.org/openrtmp-alpine.rsa.pub
@@ -87,16 +81,9 @@ apk add librtmp2 librtmp2-dev
 
 ## Packages
 
-APT creates:
+APT creates `librtmp2` and `librtmp2-dev`.
 
-- `librtmp2`
-- `librtmp2-dev`
-
-Alpine creates:
-
-- `librtmp2`
-- `librtmp2-dev`
-- `librtmp2-static`
+Alpine creates `librtmp2`, `librtmp2-dev`, and `librtmp2-static`.
 
 ## Required repository secrets
 
