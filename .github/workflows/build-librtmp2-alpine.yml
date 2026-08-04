@@ -112,7 +112,7 @@ jobs:
             /workspace/scripts/run-alpine-builder-container.sh
 
       - name: Upload APK packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: librtmp2-alpine-${{ matrix.branch }}-${{ matrix.arch }}
           path: output/${{ matrix.branch }}/main/${{ matrix.arch }}/*.apk
