@@ -61,7 +61,7 @@ jobs:
           - { codename: resolute, image: "ubuntu:26.04", architecture: s390x, platform: "linux/s390x" }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: all
@@ -112,7 +112,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
