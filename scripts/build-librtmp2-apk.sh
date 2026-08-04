@@ -13,12 +13,12 @@ cd "$WORK_DIR"
 
 current_rust_version="$(rustc --version | awk '{print $2}')"
 if [[ "$(apk version -t "$current_rust_version" "$REQUIRED_RUST_VERSION")" = "<" ]]; then
-    echo "Alpine provides Rust $current_rust_version; installing Rust $REQUIRED_RUST_VERSION with rustup."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-        | sh -s -- -y --profile minimal --default-toolchain "$REQUIRED_RUST_VERSION"
+    echo "Rust $REQUIRED_RUST_VERSION or newer is required; found $current_rust_version." >&2
+    exit 1
 fi
 
-export PATH="$HOME/.cargo/bin:$PATH"
+command -v rustc
+command -v cargo
 rustc --version
 cargo --version
 
@@ -31,7 +31,7 @@ pkgdesc="RTMP and RTMPS protocol library"
 url="https://github.com/OpenRTMP/librtmp2"
 arch="$ARCH"
 license="MIT"
-makedepends="cargo rust openssl-dev pkgconf git curl bash"
+makedepends="openssl-dev pkgconf git curl bash"
 subpackages="\$pkgname-dev \$pkgname-static"
 source="\$pkgname-\$pkgver.tar.gz::https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v\$pkgver.tar.gz"
 builddir="\$srcdir/\$pkgname-\$pkgver"
