@@ -19,9 +19,21 @@ This repository stores the OpenRTMP APT repository directly at repository root.
 
 - Debian 12 (`bookworm`)
 - Debian 13 (`trixie`)
-- Ubuntu 22.04 (`jammy`)
-- Ubuntu 24.04 (`noble`)
-- Architecture: `amd64`
+- Ubuntu 22.04 LTS (`jammy`)
+- Ubuntu 24.04 LTS (`noble`)
+- Ubuntu 26.04 LTS (`resolute`)
+
+## Supported architectures
+
+- `amd64`
+- `arm64`
+- `armhf`
+- `ppc64el`
+- `riscv64`
+- `s390x`
+- `i386` for Debian, where an official distribution image is available
+
+The workflow uses QEMU-backed native distribution containers so the package is built and linked against the libraries of the selected distribution and architecture rather than merely relabeling one binary.
 
 ## Packages
 
@@ -44,10 +56,10 @@ Open **Actions → Build librtmp2 APT packages → Run workflow** and enter a re
 The workflow:
 
 1. checks out the matching `OpenRTMP/librtmp2` release tag;
-2. builds separate packages in Debian and Ubuntu containers;
+2. builds separate packages in Debian and Ubuntu containers for every supported architecture;
 3. creates `librtmp2` and `librtmp2-dev` packages;
 4. copies the `.deb` files into `pool/main/l/librtmp2/`;
-5. regenerates `dists/<codename>/main/binary-amd64/Packages` and release metadata;
+5. regenerates every `dists/<codename>/main/binary-<architecture>/Packages` index and the release metadata;
 6. signs each distribution using the configured GPG key;
 7. commits the updated APT repository to `main`.
 
