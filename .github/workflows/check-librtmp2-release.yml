@@ -1,0 +1,167 @@
+name: Check for new librtmp2 release
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: check-librtmp2-release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check and publish new release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Resolve latest librtmp2 release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="$(gh api repos/OpenRTMP/librtmp2/releases/latest --jq '.tag_name')"
+          if [[ -z "$tag" ]]; then
+            echo "No published librtmp2 release was found." >&2
+            exit 1
+          fi
+
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Latest published librtmp2 release: $tag"
+
+      - name: Check published repositories
+        id: published
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          apt_published=false
+          alpine_published=false
+
+          if find debian/pool ubuntu/pool -type f \
+              -name "librtmp2_${VERSION}-1+*.deb" -print -quit 2>/dev/null \
+              | grep -q .; then
+            apt_published=true
+          fi
+
+          if find alpine -type f \
+              -name "librtmp2-${VERSION}-r*.apk" -print -quit 2>/dev/null \
+              | grep -q .; then
+            alpine_published=true
+          fi
+
+          echo "apt=$apt_published" >> "$GITHUB_OUTPUT"
+          echo "alpine=$alpine_published" >> "$GITHUB_OUTPUT"
+          echo "APT already published: $apt_published"
+          echo "Alpine already published: $alpine_published"
+
+      - name: Start APT package workflow
+        if: steps.published.outputs.apt != 'true'
+        id: apt_dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run build-librtmp2-packages.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f version="$VERSION"
+
+          run_id=""
+          for _ in {1..30}; do
+            run_id="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow build-librtmp2-packages.yml \
+              --event workflow_dispatch \
+              --limit 20 \
+              --json databaseId,createdAt \
+              --jq ".[] | select(.createdAt >= \"$started_at\") | .databaseId" \
+              | head -n1)"
+            [[ -n "$run_id" ]] && break
+            sleep 2
+          done
+
+          if [[ -z "$run_id" ]]; then
+            echo "Could not find the dispatched APT workflow run." >&2
+            exit 1
+          fi
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Refresh repository after APT publication
+        if: steps.published.outputs.apt != 'true'
+        shell: bash
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Recheck Alpine package publication
+        id: alpine_recheck
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          published=false
+          if find alpine -type f \
+              -name "librtmp2-${VERSION}-r*.apk" -print -quit 2>/dev/null \
+              | grep -q .; then
+            published=true
+          fi
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+
+      - name: Start Alpine package workflow
+        if: steps.alpine_recheck.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+        shell: bash
+        run: |
+          started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          gh workflow run build-librtmp2-alpine-packages.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f version="$VERSION"
+
+          run_id=""
+          for _ in {1..30}; do
+            run_id="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow build-librtmp2-alpine-packages.yml \
+              --event workflow_dispatch \
+              --limit 20 \
+              --json databaseId,createdAt \
+              --jq ".[] | select(.createdAt >= \"$started_at\") | .databaseId" \
+              | head -n1)"
+            [[ -n "$run_id" ]] && break
+            sleep 2
+          done
+
+          if [[ -z "$run_id" ]]; then
+            echo "Could not find the dispatched Alpine workflow run." >&2
+            exit 1
+          fi
+
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          echo "Checked and published repositories for librtmp2 $TAG."
