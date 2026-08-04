@@ -29,21 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         branch: [v3.21, v3.22, v3.23, v3.24]
-        include:
-          - arch: x86_64
-            platform: linux/amd64
-          - arch: x86
-            platform: linux/386
-          - arch: aarch64
-            platform: linux/arm64
-          - arch: armv7
-            platform: linux/arm/v7
-          - arch: ppc64le
-            platform: linux/ppc64le
-          - arch: riscv64
-            platform: linux/riscv64
-          - arch: s390x
-            platform: linux/s390x
+        arch: [x86_64, x86, aarch64, armv7, ppc64le, riscv64, s390x]
 
     steps:
       - name: Checkout package repository
@@ -54,15 +40,30 @@ jobs:
         with:
           platforms: all
 
-      - name: Resolve version
-        id: version
+      - name: Resolve version and platform
+        id: build
         shell: bash
         run: |
           if [[ -z "${RAW_VERSION}" ]]; then
             echo "No librtmp2 version was supplied." >&2
             exit 1
           fi
+
+          case "${{ matrix.arch }}" in
+            x86_64) platform="linux/amd64" ;;
+            x86) platform="linux/386" ;;
+            aarch64) platform="linux/arm64" ;;
+            armv7) platform="linux/arm/v7" ;;
+            ppc64le) platform="linux/ppc64le" ;;
+            riscv64) platform="linux/riscv64" ;;
+            s390x) platform="linux/s390x" ;;
+            *) echo "Unsupported architecture: ${{ matrix.arch }}" >&2; exit 1 ;;
+          esac
+
+          branch="${{ matrix.branch }}"
           echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+          echo "platform=$platform" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${branch#v}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Alpine signing key
         shell: bash
@@ -82,20 +83,20 @@ jobs:
       - name: Build APK packages
         shell: bash
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.build.outputs.version }}
         run: |
           output="$GITHUB_WORKSPACE/output/${{ matrix.branch }}/main/${{ matrix.arch }}"
           mkdir -p "$output"
           chmod +x scripts/build-librtmp2-apk.sh
 
           docker run --rm \
-            --platform "${{ matrix.platform }}" \
+            --platform "${{ steps.build.outputs.platform }}" \
             -v "$GITHUB_WORKSPACE:/workspace" \
             -v "$RUNNER_TEMP/alpine-keys:/keys:ro" \
             -e VERSION="$VERSION" \
             -e ALPINE_BRANCH="${{ matrix.branch }}" \
             -e OUTPUT_DIR="/workspace/output/${{ matrix.branch }}/main/${{ matrix.arch }}" \
-            "alpine:${{ matrix.branch#v }}" \
+            "alpine:${{ steps.build.outputs.image_tag }}" \
             /bin/sh -euxc '
               apk add --no-cache alpine-sdk bash curl git openssl-dev pkgconf sudo
               adduser -D builder
@@ -136,10 +137,6 @@ CONF
         with:
           pattern: librtmp2-alpine-*
           path: downloaded-alpine
-
-      - name: Install Alpine repository tools
-        run: |
-          docker pull alpine:3.24
 
       - name: Prepare repository files
         shell: bash
