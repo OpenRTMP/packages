@@ -17,6 +17,8 @@ if [[ "$(apk version -t "$current_rust_version" "$REQUIRED_RUST_VERSION")" = "<"
     exit 1
 fi
 
+command -v rustc
+command -v cargo
 rustc --version
 cargo --version
 
@@ -29,7 +31,7 @@ pkgdesc="RTMP and RTMPS protocol library"
 url="https://github.com/OpenRTMP/librtmp2"
 arch="$ARCH"
 license="MIT"
-makedepends="cargo rust openssl-dev pkgconf git curl bash"
+makedepends="openssl-dev pkgconf git curl bash"
 subpackages="\$pkgname-dev \$pkgname-static"
 source="\$pkgname-\$pkgver.tar.gz::https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v\$pkgver.tar.gz"
 builddir="\$srcdir/\$pkgname-\$pkgver"
