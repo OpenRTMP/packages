@@ -61,8 +61,8 @@ jobs:
           - { codename: resolute, image: "ubuntu:26.04", architecture: s390x, platform: "linux/s390x" }
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v4
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
@@ -101,7 +101,7 @@ jobs:
               scripts/build-librtmp2-deb.sh
             '
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: librtmp2-${{ matrix.codename }}-${{ matrix.architecture }}
           path: output/*.deb
@@ -112,7 +112,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
@@ -121,7 +121,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y apt-utils dpkg-dev gnupg
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: librtmp2-*
           path: downloaded-packages
