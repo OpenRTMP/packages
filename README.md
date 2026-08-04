@@ -84,24 +84,3 @@ apk add librtmp2 librtmp2-dev
 APT creates `librtmp2` and `librtmp2-dev`.
 
 Alpine creates `librtmp2`, `librtmp2-dev`, and `librtmp2-static`.
-
-## Required repository secrets
-
-APT signing:
-
-- `APT_GPG_PRIVATE_KEY`
-- `APT_GPG_PASSPHRASE`
-
-Alpine signing:
-
-- `ALPINE_RSA_PRIVATE_KEY`
-- `ALPINE_RSA_PUBLIC_KEY`
-
-## Publishing
-
-Run one of these workflows with a released version such as `0.6.0` or `v0.6.0`:
-
-- **Build librtmp2 APT packages**
-- **Build librtmp2 Alpine packages**
-
-Both workflows also accept a `repository_dispatch` event of type `librtmp2-release`.
