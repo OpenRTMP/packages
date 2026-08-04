@@ -1,0 +1,187 @@
+name: Build librtmp2 APT packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: librtmp2 release version, for example 0.6.0 or v0.6.0
+        required: true
+        type: string
+  repository_dispatch:
+    types:
+      - librtmp2-release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: librtmp2-apt-repository
+  cancel-in-progress: false
+
+env:
+  RAW_VERSION: ${{ inputs.version || github.event.client_payload.version }}
+
+jobs:
+  build:
+    name: ${{ matrix.codename }} / amd64
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - codename: bookworm
+            container: debian:12
+          - codename: trixie
+            container: debian:13
+          - codename: jammy
+            container: ubuntu:22.04
+          - codename: noble
+            container: ubuntu:24.04
+
+    steps:
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential \
+            ca-certificates \
+            curl \
+            dpkg-dev \
+            git \
+            libssl-dev \
+            pkg-config
+
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [[ -z "${RAW_VERSION}" ]]; then
+            echo "No librtmp2 version was supplied." >&2
+            exit 1
+          fi
+          VERSION="${RAW_VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain 1.93.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Checkout librtmp2 release
+        shell: bash
+        run: |
+          git clone --depth 1 --branch "v${{ steps.version.outputs.version }}" \
+            https://github.com/OpenRTMP/librtmp2.git librtmp2
+
+      - name: Build Debian packages
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          CODENAME: ${{ matrix.codename }}
+          SOURCE_DIR: ${{ github.workspace }}/librtmp2
+          OUTPUT_DIR: ${{ github.workspace }}/output
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          chmod +x scripts/build-librtmp2-deb.sh
+          scripts/build-librtmp2-deb.sh
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: librtmp2-${{ matrix.codename }}-amd64
+          path: output/*.deb
+          if-no-files-found: error
+
+  publish:
+    name: Update APT repository
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev gnupg
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: librtmp2-*-amd64
+          path: downloaded-packages
+          merge-multiple: true
+
+      - name: Add packages to pool
+        run: |
+          mkdir -p pool/main/l/librtmp2
+          find downloaded-packages -type f -name '*.deb' \
+            -exec cp {} pool/main/l/librtmp2/ \;
+
+      - name: Generate repository metadata
+        run: |
+          chmod +x scripts/generate-apt-repository.sh
+          scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE"
+
+      - name: Import signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$APT_GPG_PRIVATE_KEY" ]]; then
+            echo "Repository secret APT_GPG_PRIVATE_KEY is required." >&2
+            exit 1
+          fi
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys \
+            | awk -F: '$1 == "fpr" { print $10; exit }')"
+          if [[ -z "$KEY_FINGERPRINT" ]]; then
+            echo "No GPG signing key could be imported." >&2
+            exit 1
+          fi
+          echo "KEY_FINGERPRINT=$KEY_FINGERPRINT" >> "$GITHUB_ENV"
+          gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
+          gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
+
+      - name: Sign repository metadata
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          for codename in bookworm trixie jammy noble; do
+            release="dists/$codename/Release"
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$APT_GPG_PASSPHRASE" \
+              --local-user "$KEY_FINGERPRINT" \
+              --clearsign \
+              --output "dists/$codename/InRelease" \
+              "$release"
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$APT_GPG_PASSPHRASE" \
+              --local-user "$KEY_FINGERPRINT" \
+              --armor --detach-sign \
+              --output "dists/$codename/Release.gpg" \
+              "$release"
+          done
+
+      - name: Commit repository update
+        env:
+          VERSION: ${{ env.RAW_VERSION }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dists pool openrtmp.asc openrtmp.gpg
+          if git diff --cached --quiet; then
+            echo "APT repository is already up to date."
+            exit 0
+          fi
+          git commit -m "Publish librtmp2 ${VERSION#v} packages"
+          git push origin main
