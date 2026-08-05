@@ -43,7 +43,8 @@ prepare() {
         cargo install --locked cbindgen
         mkdir -p include/librtmp2
         \$HOME/.cargo/bin/cbindgen \\
-            --config cbindgen.toml \\
+            --lang c \\
+            --cpp-compat \\
             --crate librtmp2 \\
             --output include/librtmp2/librtmp2.h
     fi
@@ -54,7 +55,7 @@ build() {
 }
 
 package() {
-    install -Dm755 target/release/librtmp2.so \\
+    install -Dm755 target/release/liblibrtmp2.so \\
         "\$pkgdir/usr/lib/librtmp2.so.\$pkgver"
     ln -s "librtmp2.so.\$pkgver" "\$pkgdir/usr/lib/librtmp2.so.0"
 }
@@ -82,7 +83,7 @@ PC
 static() {
     pkgdesc="Static library for librtmp2"
     depends="\$pkgname-dev=\$pkgver-r\$pkgrel"
-    install -Dm644 target/release/librtmp2.a \\
+    install -Dm644 target/release/liblibrtmp2.a \\
         "\$subpkgdir/usr/lib/librtmp2.a"
 }
 EOF

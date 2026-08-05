@@ -15,7 +15,8 @@ cd "$SOURCE_DIR"
 if [[ ! -f include/librtmp2/librtmp2.h ]]; then
     cargo install --locked cbindgen
     mkdir -p include/librtmp2
-    cbindgen --config cbindgen.toml --crate librtmp2 --output include/librtmp2/librtmp2.h
+    cbindgen --lang c --cpp-compat --crate librtmp2 \
+        --output include/librtmp2/librtmp2.h
 fi
 
 cargo build --release --locked
@@ -24,7 +25,7 @@ RUNTIME_ROOT="$(mktemp -d)"
 DEV_ROOT="$(mktemp -d)"
 trap 'rm -rf "$RUNTIME_ROOT" "$DEV_ROOT"' EXIT
 
-install -Dm755 target/release/librtmp2.so \
+install -Dm755 target/release/liblibrtmp2.so \
     "$RUNTIME_ROOT/usr/lib/$MULTIARCH/librtmp2.so"
 
 mkdir -p "$RUNTIME_ROOT/DEBIAN"
@@ -42,7 +43,7 @@ Description: RTMP and RTMPS protocol library
  shared library and stable C-compatible FFI.
 EOF
 
-install -Dm644 target/release/librtmp2.a \
+install -Dm644 target/release/liblibrtmp2.a \
     "$DEV_ROOT/usr/lib/$MULTIARCH/librtmp2.a"
 install -Dm644 include/librtmp2/librtmp2.h \
     "$DEV_ROOT/usr/include/librtmp2/librtmp2.h"
