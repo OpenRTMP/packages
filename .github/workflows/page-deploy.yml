@@ -162,11 +162,11 @@ jobs:
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Index of {escape(display_path)}</title>
+            <title>OpenRTMP Packages in {escape(display_path)}</title>
             <style>{css}</style>
           </head>
           <body>
-            <h1>Index of {escape(display_path)}</h1>
+            <h1>OpenRTMP Packages in {escape(display_path)}</h1>
             <table>
               <thead>
                 <tr>
