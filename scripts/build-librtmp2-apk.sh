@@ -55,14 +55,14 @@ build() {
 }
 
 package() {
-    install -Dm755 target/release/liblibrtmp2.so \\
+    install -Dm755 "\$builddir/target/release/liblibrtmp2.so" \\
         "\$pkgdir/usr/lib/librtmp2.so.\$pkgver"
     ln -s "librtmp2.so.\$pkgver" "\$pkgdir/usr/lib/librtmp2.so.0"
 }
 
 dev() {
     default_dev
-    install -Dm644 include/librtmp2/librtmp2.h \\
+    install -Dm644 "\$builddir/include/librtmp2/librtmp2.h" \\
         "\$subpkgdir/usr/include/librtmp2/librtmp2.h"
     ln -s "librtmp2.so.\$pkgver" "\$subpkgdir/usr/lib/librtmp2.so"
     mkdir -p "\$subpkgdir/usr/lib/pkgconfig"
@@ -83,7 +83,7 @@ PC
 static() {
     pkgdesc="Static library for librtmp2"
     depends="\$pkgname-dev=\$pkgver-r\$pkgrel"
-    install -Dm644 target/release/liblibrtmp2.a \\
+    install -Dm644 "\$builddir/target/release/liblibrtmp2.a" \\
         "\$subpkgdir/usr/lib/librtmp2.a"
 }
 EOF
