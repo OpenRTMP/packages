@@ -57,15 +57,13 @@ jobs:
           apt_published=false
           alpine_published=false
 
-          if find debian/pool ubuntu/pool -type f \
-              -name "librtmp2_${VERSION}-1+*.deb" -print -quit 2>/dev/null \
-              | grep -q .; then
+          chmod +x scripts/check-librtmp2-package-completeness.sh
+
+          if scripts/check-librtmp2-package-completeness.sh apt; then
             apt_published=true
           fi
 
-          if find alpine -type f \
-              -name "librtmp2-${VERSION}-r*.apk" -print -quit 2>/dev/null \
-              | grep -q .; then
+          if scripts/check-librtmp2-package-completeness.sh alpine; then
             alpine_published=true
           fi
 
@@ -96,8 +94,8 @@ jobs:
 
           echo "apt_needed=$apt_needed" >> "$GITHUB_OUTPUT"
           echo "alpine_needed=$alpine_needed" >> "$GITHUB_OUTPUT"
-          echo "APT: published=$apt_published running=$apt_running needed=$apt_needed"
-          echo "Alpine: published=$alpine_published running=$alpine_running needed=$alpine_needed"
+          echo "APT: complete=$apt_published running=$apt_running needed=$apt_needed"
+          echo "Alpine: complete=$alpine_published running=$alpine_running needed=$alpine_needed"
 
   dispatch-apt:
     name: Start APT package workflow
@@ -154,5 +152,5 @@ jobs:
             echo "- APT build required: \`${{ needs.check.outputs.apt_needed }}\`"
             echo "- Alpine build required: \`${{ needs.check.outputs.alpine_needed }}\`"
             echo
-            echo "APT and Alpine are dispatched independently and can run in parallel."
+            echo "A repository is considered published only when every configured package target and its repository metadata are present."
           } >> "$GITHUB_STEP_SUMMARY"
