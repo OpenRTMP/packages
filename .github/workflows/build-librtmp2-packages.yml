@@ -11,6 +11,7 @@ on:
     types: [librtmp2-release]
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -208,6 +209,7 @@ jobs:
           done
 
       - name: Commit repository update
+        id: publish
         if: steps.packages.outputs.available == 'true'
         env:
           VERSION: ${{ env.RAW_VERSION }}
@@ -216,8 +218,19 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add debian ubuntu openrtmp.asc openrtmp.gpg
           if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
             echo "Package repositories are already up to date."
             exit 0
           fi
           git commit -m "Publish librtmp2 ${VERSION#v} Debian and Ubuntu packages"
           git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
