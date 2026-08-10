@@ -121,7 +121,11 @@ jobs:
   publish:
     name: Update Alpine repository
     needs: build
+    if: always() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
 
     steps:
       - name: Checkout package repository
@@ -129,13 +133,28 @@ jobs:
         with:
           ref: main
 
-      - name: Download packages
+      - name: Download successful package artifacts
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           pattern: librtmp2-alpine-*
           path: downloaded-alpine
 
+      - name: Check for built packages
+        id: packages
+        shell: bash
+        run: |
+          if [[ -d downloaded-alpine ]] \
+              && find downloaded-alpine -type f -name '*.apk' -print -quit | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Successful Alpine package artifacts are available for publishing."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No successful Alpine package artifacts are available; nothing to publish."
+          fi
+
       - name: Prepare repository files
+        if: steps.packages.outputs.available == 'true'
         shell: bash
         env:
           ALPINE_RSA_PRIVATE_KEY: ${{ secrets.ALPINE_RSA_PRIVATE_KEY }}
@@ -164,6 +183,7 @@ jobs:
           chmod 600 "$RUNNER_TEMP/alpine-keys/openrtmp-alpine.rsa"
 
       - name: Generate and sign APK indexes
+        if: steps.packages.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -176,6 +196,7 @@ jobs:
             /bin/sh -euxc 'apk add --no-cache alpine-sdk bash && ALPINE_PRIVATE_KEY_PATH=/keys/openrtmp-alpine.rsa /repo/scripts/generate-apk-repository.sh /repo'
 
       - name: Commit repository update
+        if: steps.packages.outputs.available == 'true'
         shell: bash
         env:
           VERSION: ${{ env.RAW_VERSION }}
