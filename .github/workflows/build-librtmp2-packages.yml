@@ -33,7 +33,7 @@ jobs:
           - { codename: bookworm, image: "debian:12", architecture: armhf, platform: "linux/arm/v7" }
           - { codename: bookworm, image: "debian:12", architecture: i386, platform: "linux/386" }
           - { codename: bookworm, image: "debian:12", architecture: ppc64el, platform: "linux/ppc64le" }
-          - { codename: bookworm, image: "debian:12", architecture: s390x, platform: "linux/s390x" }
+          - { codename: bookworm, image: "s390x/debian:12", architecture: s390x, platform: "linux/s390x" }
           - { codename: trixie, image: "debian:13", architecture: amd64, platform: "linux/amd64" }
           - { codename: trixie, image: "debian:13", architecture: arm64, platform: "linux/arm64" }
           - { codename: trixie, image: "debian:13", architecture: armhf, platform: "linux/arm/v7" }
@@ -91,10 +91,16 @@ jobs:
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config
+              rustup_args=(-y --profile minimal --default-toolchain 1.93.0)
+              if [ "$EXPECTED_ARCHITECTURE" = "i386" ]; then
+                rustup_args+=(--default-host i686-unknown-linux-gnu)
+              fi
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
-                | sh -s -- -y --profile minimal --default-toolchain 1.93.0
+                | sh -s -- "${rustup_args[@]}"
               export PATH="$HOME/.cargo/bin:$PATH"
               test "$(dpkg --print-architecture)" = "$EXPECTED_ARCHITECTURE"
+              cargo --version
+              rustc --version
               git clone --depth 1 --branch "v$VERSION" \
                 https://github.com/OpenRTMP/librtmp2.git "$SOURCE_DIR"
               chmod +x scripts/build-librtmp2-deb.sh
