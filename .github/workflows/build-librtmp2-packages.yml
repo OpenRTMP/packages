@@ -11,6 +11,7 @@ on:
     types: [librtmp2-release]
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -116,24 +117,46 @@ jobs:
   publish:
     name: Update Debian and Ubuntu repositories
     needs: build
+    if: always() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
+
     steps:
       - uses: actions/checkout@v7
         with:
           ref: main
 
-      - name: Install repository tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y apt-utils dpkg-dev gnupg
-
-      - uses: actions/download-artifact@v8
+      - name: Download successful package artifacts
+        uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           pattern: librtmp2-*
           path: downloaded-packages
           merge-multiple: true
 
+      - name: Check for built packages
+        id: packages
+        shell: bash
+        run: |
+          if [[ -d downloaded-packages ]] \
+              && find downloaded-packages -type f -name '*.deb' -print -quit | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Successful APT package artifacts are available for publishing."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No successful APT package artifacts are available; nothing to publish."
+          fi
+
+      - name: Install repository tools
+        if: steps.packages.outputs.available == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev gnupg
+
       - name: Sort packages into distribution pools
+        if: steps.packages.outputs.available == 'true'
         shell: bash
         run: |
           mkdir -p debian/pool/main/l/librtmp2 ubuntu/pool/main/l/librtmp2
@@ -148,12 +171,14 @@ jobs:
           done
 
       - name: Generate APT metadata
+        if: steps.packages.outputs.available == 'true'
         run: |
           chmod +x scripts/generate-apt-repository.sh
           scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/debian" bookworm trixie
           scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/ubuntu" jammy noble resolute
 
       - name: Import signing key
+        if: steps.packages.outputs.available == 'true'
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
         shell: bash
@@ -167,11 +192,13 @@ jobs:
           gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
 
       - name: Sign Debian and Ubuntu metadata
+        if: steps.packages.outputs.available == 'true'
         env:
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
         shell: bash
         run: |
           for release in debian/dists/{bookworm,trixie}/Release ubuntu/dists/{jammy,noble,resolute}/Release; do
+            [[ -f "$release" ]] || continue
             directory="$(dirname "$release")"
             gpg --batch --yes --pinentry-mode loopback \
               --passphrase "$APT_GPG_PASSPHRASE" --local-user "$KEY_FINGERPRINT" \
@@ -182,6 +209,8 @@ jobs:
           done
 
       - name: Commit repository update
+        id: publish
+        if: steps.packages.outputs.available == 'true'
         env:
           VERSION: ${{ env.RAW_VERSION }}
         run: |
@@ -189,8 +218,19 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add debian ubuntu openrtmp.asc openrtmp.gpg
           if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
             echo "Package repositories are already up to date."
             exit 0
           fi
           git commit -m "Publish librtmp2 ${VERSION#v} Debian and Ubuntu packages"
           git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main

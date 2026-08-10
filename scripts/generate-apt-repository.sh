@@ -42,8 +42,8 @@ for codename in "${CODENAMES[@]}"; do
     done
 
     if [[ ${#available_architectures[@]} -eq 0 ]]; then
-        echo "No packages found for $codename in $REPOSITORY_DIR." >&2
-        exit 1
+        echo "No packages found for $codename in $REPOSITORY_DIR; skipping release metadata."
+        continue
     fi
 
     release_tmp="$(mktemp)"
