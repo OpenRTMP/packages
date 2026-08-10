@@ -19,7 +19,7 @@ if [[ ! -f include/librtmp2/librtmp2.h ]]; then
         --output include/librtmp2/librtmp2.h
 fi
 
-cargo build --release --locked
+cargo build --release
 
 RUNTIME_ROOT="$(mktemp -d)"
 DEV_ROOT="$(mktemp -d)"

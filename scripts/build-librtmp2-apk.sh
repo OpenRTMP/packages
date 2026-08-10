@@ -51,7 +51,7 @@ prepare() {
 }
 
 build() {
-    cargo build --release --locked
+    cargo build --release
 }
 
 package() {
