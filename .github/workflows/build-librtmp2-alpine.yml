@@ -11,6 +11,7 @@ on:
     types: [librtmp2-release]
 
 permissions:
+  actions: write
   contents: write
 
 env:
@@ -196,6 +197,7 @@ jobs:
             /bin/sh -euxc 'apk add --no-cache alpine-sdk bash && ALPINE_PRIVATE_KEY_PATH=/keys/openrtmp-alpine.rsa /repo/scripts/generate-apk-repository.sh /repo'
 
       - name: Commit repository update
+        id: publish
         if: steps.packages.outputs.available == 'true'
         shell: bash
         env:
@@ -207,9 +209,20 @@ jobs:
           git add alpine openrtmp-alpine.rsa.pub
 
           if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
             echo "Alpine repository is already up to date."
             exit 0
           fi
 
           git commit -m "Publish librtmp2 ${VERSION#v} Alpine packages"
           git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
