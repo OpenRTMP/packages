@@ -91,11 +91,13 @@ EOF
 
 abuild checksum
 
-build_log="$WORK_DIR/abuild.log"
-set +e
-abuild -r 2>&1 | tee "$build_log"
-abuild_status=${PIPESTATUS[0]}
-set -e
+# Build the APKs explicitly instead of using abuild's default `all` action.
+# The default action also regenerates/signs a temporary local repository index,
+# but the workflow publishes its own APKINDEX after collecting all artifacts.
+abuild validate clean fetch
+abuild deps
+abuild unpack prepare build rootpkg
+abuild undeps
 
 package_root="$HOME/packages"
 expected_packages=(
@@ -103,24 +105,13 @@ expected_packages=(
     "librtmp2-dev-$VERSION-r0.apk"
     "librtmp2-static-$VERSION-r0.apk"
 )
-packages_complete=true
 
 for expected in "${expected_packages[@]}"; do
     if ! find "$package_root" -type f -path "*/$ARCH/$expected" -print -quit | grep -q .; then
-        packages_complete=false
-        break
+        echo "Expected Alpine package was not produced: $expected" >&2
+        exit 1
     fi
 done
-
-if (( abuild_status != 0 )); then
-    if [[ "$packages_complete" == true ]] \
-        && tail -n 10 "$build_log" | grep -q 'Signing the index'; then
-        echo "abuild created all APKs but failed while signing its temporary local repository index."
-        echo "Continuing because the publish job generates and signs the repository APKINDEX separately."
-    else
-        exit "$abuild_status"
-    fi
-fi
 
 find "$package_root" -type f -path "*/$ARCH/*.apk" -exec cp {} "$OUTPUT_DIR/" \;
 
