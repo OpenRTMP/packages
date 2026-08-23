@@ -64,6 +64,7 @@ dev() {
     default_dev
     install -Dm644 "\$builddir/include/librtmp2/librtmp2.h" \\
         "\$subpkgdir/usr/include/librtmp2/librtmp2.h"
+    install -d "\$subpkgdir/usr/lib"
     ln -s "librtmp2.so.\$pkgver" "\$subpkgdir/usr/lib/librtmp2.so"
     mkdir -p "\$subpkgdir/usr/lib/pkgconfig"
     cat > "\$subpkgdir/usr/lib/pkgconfig/librtmp2.pc" <<PC
