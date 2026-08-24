@@ -121,6 +121,6 @@ if ! compgen -G "$OUTPUT_DIR/*.apk" > /dev/null; then
 fi
 
 for package in "$OUTPUT_DIR"/*.apk; do
-    apk info --contents --allow-untrusted "$package" >/dev/null
-    echo "Built $package"
+    apk verify "$package"
+    echo "Built and verified $package"
 done
