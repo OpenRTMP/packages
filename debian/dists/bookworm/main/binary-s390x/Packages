@@ -15,6 +15,23 @@ Description: RTMP and RTMPS protocol library
  librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
  shared library and stable C-compatible FFI.
 
+Package: librtmp2
+Version: 0.8.0-1+bookworm1
+Architecture: s390x
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: libc6, libssl3
+Filename: pool/main/l/librtmp2/librtmp2_0.8.0-1+bookworm1_s390x.deb
+Size: 330904
+MD5sum: 6aea89647ea41a96758eabe9c544dcfc
+SHA1: ab36032ccdebca3ea67852d0a606747b009f4c29
+SHA256: 9ede1002007436c50030c4b7352cd84a05070fe69ccc2d9d7b5f05f3ee6d045f
+Section: libs
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: RTMP and RTMPS protocol library
+ librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
+ shared library and stable C-compatible FFI.
+
 Package: librtmp2-dev
 Version: 0.7.0-1+bookworm1
 Architecture: s390x
@@ -25,6 +42,23 @@ Size: 4496760
 MD5sum: 03f924229a4d323de9a0ad0024d69f2f
 SHA1: 97b9a2fe0f7ff8cb0e9701450d9b12e47ee12df2
 SHA256: 84c5bd557133101521ffc39e47c14a2e777d7af5d4736cda18ea9886d2115e89
+Section: libdevel
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: Development files for librtmp2
+ This package contains the C header, static library, and pkg-config metadata
+ required to build software against librtmp2.
+
+Package: librtmp2-dev
+Version: 0.8.0-1+bookworm1
+Architecture: s390x
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: librtmp2 (= 0.8.0-1+bookworm1)
+Filename: pool/main/l/librtmp2/librtmp2-dev_0.8.0-1+bookworm1_s390x.deb
+Size: 4503756
+MD5sum: 5df5f5fcb4b7d29d4c8a7c9ee32442e5
+SHA1: 6844ec8c6376dfa2f8b30f84164cc3872811a30e
+SHA256: e8e962735cd0f1888499ff279b1752a7318040887ad77dbd6fcdf3700e117b37
 Section: libdevel
 Priority: optional
 Homepage: https://github.com/OpenRTMP/librtmp2

@@ -15,6 +15,23 @@ Description: RTMP and RTMPS protocol library
  librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
  shared library and stable C-compatible FFI.
 
+Package: librtmp2
+Version: 0.8.0-1+trixie1
+Architecture: s390x
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: libc6, libssl3
+Filename: pool/main/l/librtmp2/librtmp2_0.8.0-1+trixie1_s390x.deb
+Size: 331008
+MD5sum: 81cbf85f20b716e5ca9b0d61abc7e11c
+SHA1: 7d8929a9b930583da4b7efa6bc76d62b8067b1f3
+SHA256: 79edf6c5d28716c217d5c74efacf1c7299829ebad14fe90803d474428fc8fa56
+Section: libs
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: RTMP and RTMPS protocol library
+ librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
+ shared library and stable C-compatible FFI.
+
 Package: librtmp2-dev
 Version: 0.7.0-1+trixie1
 Architecture: s390x
@@ -25,6 +42,23 @@ Size: 4500684
 MD5sum: 2c43220c2cd389bcb8b444ef5573c318
 SHA1: 55f076cc5cc7e0f16d397af06cc1995ad26f04a1
 SHA256: f3e08239f2824ee3f95a591108a83c7eb7b39bbc2a44ac17e7220fdfc215f8f5
+Section: libdevel
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: Development files for librtmp2
+ This package contains the C header, static library, and pkg-config metadata
+ required to build software against librtmp2.
+
+Package: librtmp2-dev
+Version: 0.8.0-1+trixie1
+Architecture: s390x
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: librtmp2 (= 0.8.0-1+trixie1)
+Filename: pool/main/l/librtmp2/librtmp2-dev_0.8.0-1+trixie1_s390x.deb
+Size: 4502640
+MD5sum: f2703af65f4153653a23a58be71c6404
+SHA1: 33f8e27dbb829a5cfb2f2e8ce492eae97904ca75
+SHA256: 3b4d5eef68b2c68490418893f78f26964ff9479b2807ef3e8ad527f71f0c01c8
 Section: libdevel
 Priority: optional
 Homepage: https://github.com/OpenRTMP/librtmp2
