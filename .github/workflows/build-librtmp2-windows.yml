@@ -1,4 +1,4 @@
-name: Build librtmp2 Windows package
+name: Build librtmp2 Windows packages
 
 on:
   workflow_dispatch:
@@ -19,8 +19,18 @@ env:
 
 jobs:
   build:
-    name: Windows / x86_64
+    name: Windows / ${{ matrix.arch }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            rust_target: x86_64-pc-windows-msvc
+            vcpkg_triplet: x64-windows-static-md
+          - arch: arm64
+            rust_target: aarch64-pc-windows-msvc
+            vcpkg_triplet: arm64-windows-static-md
 
     steps:
       - name: Checkout package repository
@@ -38,30 +48,37 @@ jobs:
 
       - name: Install Rust toolchain
         shell: pwsh
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           rustup toolchain install 1.93.0 --profile minimal
           rustup default 1.93.0
+          rustup target add $env:RUST_TARGET
           rustc --version
           cargo --version
 
       - name: Install static OpenSSL
         shell: pwsh
+        env:
+          VCPKG_TRIPLET: ${{ matrix.vcpkg_triplet }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:VCPKG_INSTALLATION_ROOT)) {
             throw "VCPKG_INSTALLATION_ROOT is not available on this runner."
           }
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:x64-windows-static-md
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "openssl:$env:VCPKG_TRIPLET"
 
       - name: Build librtmp2
         shell: pwsh
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          VCPKG_TRIPLET: ${{ matrix.vcpkg_triplet }}
         run: |
           $source = Join-Path $env:GITHUB_WORKSPACE "librtmp2"
           git clone --depth 1 --branch "v$env:VERSION" https://github.com/OpenRTMP/librtmp2.git $source
           Set-Location $source
 
-          $env:OPENSSL_DIR = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\x64-windows-static-md"
+          $env:OPENSSL_DIR = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\$env:VCPKG_TRIPLET"
           $env:OPENSSL_STATIC = "1"
 
           cargo install --locked cbindgen
@@ -70,23 +87,27 @@ jobs:
             cbindgen --lang c --cpp-compat --crate librtmp2 --output "include\librtmp2\librtmp2.h"
           }
 
-          cargo build --release --locked
+          cargo build --release --locked --target $env:RUST_TARGET
 
-          if (-not (Test-Path "target\release\librtmp2.dll")) {
-            throw "target\release\librtmp2.dll was not produced."
+          $targetDir = Join-Path $source "target\$env:RUST_TARGET\release"
+          if (-not (Test-Path (Join-Path $targetDir "librtmp2.dll"))) {
+            throw "$targetDir\librtmp2.dll was not produced."
           }
-          if (-not (Get-ChildItem "target\release" -Filter "librtmp2*.lib" -ErrorAction SilentlyContinue)) {
-            throw "No librtmp2 import/static library was produced."
+          if (-not (Get-ChildItem $targetDir -Filter "librtmp2*.lib" -ErrorAction SilentlyContinue)) {
+            throw "No librtmp2 import/static library was produced in $targetDir."
           }
 
       - name: Create Windows package
         shell: pwsh
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           $source = Join-Path $env:GITHUB_WORKSPACE "librtmp2"
-          $output = Join-Path $env:GITHUB_WORKSPACE "artifact\windows\x86_64\$env:VERSION"
-          $stageName = "librtmp2-$env:VERSION-windows-x86_64"
+          $targetDir = Join-Path $source "target\$env:RUST_TARGET\release"
+          $output = Join-Path $env:GITHUB_WORKSPACE "artifact\windows\$env:ARCH\$env:VERSION"
+          $stageName = "librtmp2-$env:VERSION-windows-$env:ARCH"
           $stage = Join-Path $env:RUNNER_TEMP $stageName
 
           @(
@@ -96,8 +117,8 @@ jobs:
           ) | ForEach-Object { New-Item -ItemType Directory -Force -Path $_ | Out-Null }
           New-Item -ItemType Directory -Force -Path $output | Out-Null
 
-          Copy-Item (Join-Path $source "target\release\librtmp2.dll") (Join-Path $stage "bin\")
-          Get-ChildItem (Join-Path $source "target\release") -Filter "librtmp2*.lib" |
+          Copy-Item (Join-Path $targetDir "librtmp2.dll") (Join-Path $stage "bin\")
+          Get-ChildItem $targetDir -Filter "librtmp2*.lib" |
             Copy-Item -Destination (Join-Path $stage "lib\")
           Copy-Item (Join-Path $source "include\librtmp2\librtmp2.h") (Join-Path $stage "include\librtmp2\")
           Copy-Item (Join-Path $source "README.md") $stage
@@ -112,7 +133,7 @@ jobs:
       - name: Upload Windows package
         uses: actions/upload-artifact@v7
         with:
-          name: librtmp2-windows-x86_64
+          name: librtmp2-windows-${{ matrix.arch }}
           path: artifact
           if-no-files-found: error
 
@@ -131,7 +152,7 @@ jobs:
         with:
           ref: main
 
-      - name: Download Windows package artifact
+      - name: Download Windows package artifacts
         uses: actions/download-artifact@v8
         continue-on-error: true
         with:
@@ -139,20 +160,20 @@ jobs:
           path: downloaded-windows
           merge-multiple: true
 
-      - name: Check for built package
+      - name: Check for built packages
         id: packages
         shell: bash
         run: |
           if [[ -d downloaded-windows/windows ]] \
               && find downloaded-windows/windows -type f -name '*.zip' -print -quit | grep -q .; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "A successful Windows package artifact is available for publishing."
+            echo "Successful Windows package artifacts are available for publishing."
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "No successful Windows package artifact is available; nothing to publish."
+            echo "No successful Windows package artifacts are available; nothing to publish."
           fi
 
-      - name: Import signing key and sign package
+      - name: Import signing key and sign packages
         if: steps.packages.outputs.available == 'true'
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
@@ -176,7 +197,7 @@ jobs:
               --output "$package.asc" "$package"
           done < <(find downloaded-windows/windows -type f -name '*.zip' -print0)
 
-      - name: Publish Windows package
+      - name: Publish Windows packages
         if: steps.packages.outputs.available == 'true'
         shell: bash
         run: |
@@ -202,7 +223,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Publish librtmp2 ${VERSION#v} Windows package"
+          git commit -m "Publish librtmp2 ${VERSION#v} Windows packages"
           git push origin main
           echo "published=true" >> "$GITHUB_OUTPUT"
 
