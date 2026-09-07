@@ -64,18 +64,36 @@ jobs:
 
           running_count() {
             local workflow="$1"
+            local run_prefix="$2"
+
             gh run list \
               --repo "$GITHUB_REPOSITORY" \
               --workflow "$workflow" \
               --limit 20 \
-              --json status \
-              --jq '[.[] | select(.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "pending" or .status == "requested")] | length'
+              --json status,displayTitle \
+              | jq \
+                  --arg version "$VERSION" \
+                  --arg prefix "$run_prefix" \
+                  '[.[]
+                    | select(
+                        .status == "queued"
+                        or .status == "in_progress"
+                        or .status == "waiting"
+                        or .status == "pending"
+                        or .status == "requested"
+                      )
+                    | select(
+                        .displayTitle == ($prefix + " " + $version)
+                        or .displayTitle == ($prefix + " v" + $version)
+                      )
+                  ] | length'
           }
 
           target_status() {
             local target="$1"
             local workflow="$2"
             local checker="$3"
+            local run_prefix="$4"
             local published=false
             local running
             local needed=true
@@ -83,7 +101,7 @@ jobs:
             if "$checker" "$target"; then
               published=true
             fi
-            running="$(running_count "$workflow")"
+            running="$(running_count "$workflow" "$run_prefix")"
             if [[ "$published" == true || "$running" -gt 0 ]]; then
               needed=false
             fi
@@ -92,12 +110,12 @@ jobs:
             echo "$target: complete=$published running=$running needed=$needed"
           }
 
-          target_status apt build-librtmp2-packages.yml scripts/check-librtmp2-package-completeness.sh
-          target_status alpine build-librtmp2-alpine.yml scripts/check-librtmp2-package-completeness.sh
-          target_status rpm build-librtmp2-rpm.yml scripts/check-librtmp2-additional-package-completeness.sh
-          target_status arch build-librtmp2-arch.yml scripts/check-librtmp2-additional-package-completeness.sh
-          target_status homebrew update-librtmp2-homebrew.yml scripts/check-librtmp2-additional-package-completeness.sh
-          target_status windows build-librtmp2-windows.yml scripts/check-librtmp2-additional-package-completeness.sh
+          target_status apt build-librtmp2-packages.yml scripts/check-librtmp2-package-completeness.sh "Build librtmp2 APT"
+          target_status alpine build-librtmp2-alpine.yml scripts/check-librtmp2-package-completeness.sh "Build librtmp2 Alpine"
+          target_status rpm build-librtmp2-rpm.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 RPM"
+          target_status arch build-librtmp2-arch.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Arch"
+          target_status homebrew update-librtmp2-homebrew.yml scripts/check-librtmp2-additional-package-completeness.sh "Update librtmp2 Homebrew"
+          target_status windows build-librtmp2-windows.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Windows"
 
   dispatch-apt:
     name: Start APT package workflow
