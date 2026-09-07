@@ -39,7 +39,9 @@ jobs:
           version="${RAW_VERSION#v}"
           url="https://github.com/OpenRTMP/librtmp2/releases/download/v${version}/librtmp2-${version}-src.tar.gz"
           archive="$RUNNER_TEMP/librtmp2-${version}-src.tar.gz"
-          curl --fail --location --silent --show-error "$url" -o "$archive"
+          curl --fail --location --silent --show-error \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            "$url" -o "$archive"
           sha256="$(sha256sum "$archive" | awk '{print $1}')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "url=$url" >> "$GITHUB_OUTPUT"
