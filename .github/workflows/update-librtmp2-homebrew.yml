@@ -1,0 +1,149 @@
+name: Update librtmp2 Homebrew formula
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [librtmp2-release]
+
+permissions:
+  contents: write
+
+env:
+  RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+jobs:
+  update:
+    name: Update Homebrew formula
+    runs-on: ubuntu-latest
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Resolve source archive
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${RAW_VERSION:-}" || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          version="${RAW_VERSION#v}"
+          url="https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v${version}.tar.gz"
+          archive="$RUNNER_TEMP/librtmp2-${version}.tar.gz"
+          curl --fail --location --silent --show-error "$url" -o "$archive"
+          sha256="$(sha256sum "$archive" | awk '{print $1}')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Generate formula
+        env:
+          VERSION: ${{ steps.source.outputs.version }}
+          SOURCE_SHA256: ${{ steps.source.outputs.sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p Formula
+          cat > Formula/librtmp2.rb <<'RUBY'
+          class Librtmp2 < Formula
+            desc "Modern RTMP and RTMPS protocol library"
+            homepage "https://github.com/OpenRTMP/librtmp2"
+            url "https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v@VERSION@.tar.gz"
+            sha256 "@SHA256@"
+            license "MIT"
+
+            depends_on "cbindgen" => :build
+            depends_on "pkgconf" => :build
+            depends_on "rust" => :build
+            depends_on "openssl@3"
+
+            def install
+              ENV["OPENSSL_DIR"] = Formula["openssl@3"].opt_prefix
+
+              system "cargo", "build", "--release", "--locked"
+
+              unless File.exist?("include/librtmp2/librtmp2.h")
+                mkdir_p "include/librtmp2"
+                system "cbindgen", "--lang", "c", "--cpp-compat", "--crate", "librtmp2",
+                       "--output", "include/librtmp2/librtmp2.h"
+              end
+
+              include.install "include/librtmp2"
+              lib.install "target/release/liblibrtmp2.a"
+              lib.install_symlink "liblibrtmp2.a" => "librtmp2.a"
+
+              if OS.mac?
+                lib.install "target/release/liblibrtmp2.dylib"
+                lib.install_symlink "liblibrtmp2.dylib" => "librtmp2.dylib"
+              else
+                lib.install "target/release/liblibrtmp2.so"
+                lib.install_symlink "liblibrtmp2.so" => "librtmp2.so"
+              end
+
+              (lib/"pkgconfig").mkpath
+              (lib/"pkgconfig/librtmp2.pc").write <<~EOS
+                prefix=#{prefix}
+                exec_prefix=${prefix}
+                libdir=#{lib}
+                includedir=#{include}
+
+                Name: librtmp2
+                Description: RTMP and RTMPS protocol library
+                Version: #{version}
+                Libs: -L${libdir} -lrtmp2
+                Cflags: -I${includedir}/librtmp2
+              EOS
+            end
+
+            test do
+              assert_predicate include/"librtmp2/librtmp2.h", :exist?
+              assert_predicate lib/"librtmp2.a", :exist?
+            end
+          end
+          RUBY
+
+          sed -i \
+            -e "s/@VERSION@/$VERSION/g" \
+            -e "s/@SHA256@/$SOURCE_SHA256/g" \
+            Formula/librtmp2.rb
+
+          ruby -c Formula/librtmp2.rb
+
+      - name: Commit formula update
+        id: publish
+        env:
+          VERSION: ${{ steps.source.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/librtmp2.rb
+
+          if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "Homebrew formula is already up to date."
+            exit 0
+          fi
+
+          git commit -m "Update Homebrew formula for librtmp2 $VERSION"
+          git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
