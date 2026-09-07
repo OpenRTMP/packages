@@ -63,9 +63,11 @@ check_arch() {
     check_file "$package" || missing=1
     check_file "$package.sig" || missing=1
     check_file "$base/openrtmp.db" || missing=1
+    check_file "$base/openrtmp.db.sig" || missing=1
     check_file "$base/openrtmp.db.tar.gz" || missing=1
     check_file "$base/openrtmp.db.tar.gz.sig" || missing=1
     check_file "$base/openrtmp.files" || missing=1
+    check_file "$base/openrtmp.files.sig" || missing=1
     check_file "$base/openrtmp.files.tar.gz" || missing=1
     check_file "$base/openrtmp.files.tar.gz.sig" || missing=1
 
