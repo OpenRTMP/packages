@@ -10,7 +10,9 @@ mkdir -p "$OUTPUT_DIR"
 cd "$WORK_DIR"
 
 SOURCE_URL="https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v${VERSION}.tar.gz"
-curl --fail --location --silent --show-error "$SOURCE_URL" -o "librtmp2-${VERSION}.tar.gz"
+curl --fail --location --silent --show-error \
+    --proto '=https' --proto-redir '=https' --tlsv1.2 \
+    "$SOURCE_URL" -o "librtmp2-${VERSION}.tar.gz"
 SOURCE_SHA256="$(sha256sum "librtmp2-${VERSION}.tar.gz" | awk '{print $1}')"
 
 cat > PKGBUILD <<'PKGBUILD'
@@ -75,7 +77,7 @@ sed -i \
 makepkg --clean --cleanbuild --force --noconfirm
 
 package="$(find . -maxdepth 1 -type f -name "librtmp2-${VERSION}-*.pkg.tar.zst" -print -quit)"
-test -n "$package" || { echo "Arch package was not created." >&2; exit 1; }
+[[ -n "$package" ]] || { echo "Arch package was not created." >&2; exit 1; }
 cp "$package" "$OUTPUT_DIR/"
 
 bsdtar -xOf "$package" .PKGINFO
