@@ -37,8 +37,8 @@ jobs:
           set -euo pipefail
           test -n "${RAW_VERSION:-}" || { echo "No librtmp2 version supplied." >&2; exit 1; }
           version="${RAW_VERSION#v}"
-          url="https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v${version}.tar.gz"
-          archive="$RUNNER_TEMP/librtmp2-${version}.tar.gz"
+          url="https://github.com/OpenRTMP/librtmp2/releases/download/v${version}/librtmp2-${version}-src.tar.gz"
+          archive="$RUNNER_TEMP/librtmp2-${version}-src.tar.gz"
           curl --fail --location --silent --show-error "$url" -o "$archive"
           sha256="$(sha256sum "$archive" | awk '{print $1}')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -57,7 +57,7 @@ jobs:
           class Librtmp2 < Formula
             desc "Modern RTMP and RTMPS protocol library"
             homepage "https://github.com/OpenRTMP/librtmp2"
-            url "https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v@VERSION@.tar.gz"
+            url "https://github.com/OpenRTMP/librtmp2/releases/download/v@VERSION@/librtmp2-@VERSION@-src.tar.gz"
             sha256 "@SHA256@"
             license "MIT"
 
