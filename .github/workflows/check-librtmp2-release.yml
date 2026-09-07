@@ -5,10 +5,6 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch:
 
-permissions:
-  actions: write
-  contents: read
-
 concurrency:
   group: check-librtmp2-release
   cancel-in-progress: false
@@ -17,6 +13,9 @@ jobs:
   check:
     name: Check latest release
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
@@ -105,6 +104,8 @@ jobs:
     needs: check
     if: needs.check.outputs.apt_needed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Dispatch APT build
         env:
@@ -117,6 +118,8 @@ jobs:
     needs: check
     if: needs.check.outputs.alpine_needed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Dispatch Alpine build
         env:
@@ -129,6 +132,8 @@ jobs:
     needs: check
     if: needs.check.outputs.rpm_needed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Dispatch RPM build
         env:
@@ -141,6 +146,8 @@ jobs:
     needs: check
     if: needs.check.outputs.arch_needed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Dispatch Arch Linux build
         env:
@@ -153,6 +160,8 @@ jobs:
     needs: check
     if: needs.check.outputs.homebrew_needed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Dispatch Homebrew update
         env:
@@ -165,6 +174,8 @@ jobs:
     needs: check
     if: needs.check.outputs.windows_needed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Dispatch Windows build
         env:
@@ -184,6 +195,7 @@ jobs:
       - dispatch-windows
     if: always()
     runs-on: ubuntu-latest
+    permissions: {}
 
     steps:
       - name: Write summary
