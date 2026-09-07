@@ -10,10 +10,6 @@ on:
   repository_dispatch:
     types: [librtmp2-release]
 
-permissions:
-  actions: write
-  contents: write
-
 concurrency:
   group: librtmp2-package-repository
   cancel-in-progress: false
@@ -25,6 +21,8 @@ jobs:
   build:
     name: ${{ matrix.codename }} / ${{ matrix.architecture }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +61,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
         with:
           platforms: all
 
@@ -119,6 +117,9 @@ jobs:
     needs: build
     if: always() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
     concurrency:
       group: librtmp2-repository-publish
       cancel-in-progress: false
