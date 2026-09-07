@@ -1,5 +1,7 @@
 name: Build librtmp2 Arch Linux package
 
+run-name: Build librtmp2 Arch ${{ github.event.inputs.version || github.event.client_payload.version }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -27,13 +29,15 @@ jobs:
     steps:
       - name: Checkout package repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Resolve version
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${RAW_VERSION:-}" || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          [[ -n "${RAW_VERSION:-}" ]] || { echo "No librtmp2 version supplied." >&2; exit 1; }
           echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build Arch Linux package
@@ -70,7 +74,7 @@ jobs:
   publish:
     name: Update Arch Linux repository
     needs: build
-    if: always() && needs.build.result != 'cancelled'
+    if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -87,7 +91,6 @@ jobs:
 
       - name: Download package artifact
         uses: actions/download-artifact@v8
-        continue-on-error: true
         with:
           pattern: librtmp2-arch-*
           path: downloaded-arch
@@ -113,10 +116,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$APT_GPG_PRIVATE_KEY" || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
+          [[ -n "$APT_GPG_PRIVATE_KEY" ]] || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
           printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
           KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
-          test -n "$KEY_FINGERPRINT"
+          [[ -n "$KEY_FINGERPRINT" ]]
           echo "KEY_FINGERPRINT=$KEY_FINGERPRINT" >> "$GITHUB_ENV"
           gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
           gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
@@ -163,10 +166,12 @@ jobs:
         run: |
           set -euo pipefail
           for database in \
+            arch/x86_64/openrtmp.db \
             arch/x86_64/openrtmp.db.tar.gz \
+            arch/x86_64/openrtmp.files \
             arch/x86_64/openrtmp.files.tar.gz
           do
-            test -f "$database"
+            [[ -f "$database" ]]
             gpg --batch --yes --pinentry-mode loopback \
               --passphrase "$APT_GPG_PASSPHRASE" \
               --local-user "$KEY_FINGERPRINT" \
