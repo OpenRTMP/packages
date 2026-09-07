@@ -79,7 +79,7 @@ check_arch() {
 
 check_homebrew() {
     if [[ ! -f "$ROOT_DIR/Formula/librtmp2.rb" ]] \
-        || ! grep -Fq "/tags/v${VERSION}.tar.gz" "$ROOT_DIR/Formula/librtmp2.rb"; then
+        || ! grep -Fq "/releases/download/v${VERSION}/librtmp2-${VERSION}-src.tar.gz" "$ROOT_DIR/Formula/librtmp2.rb"; then
         echo "Homebrew formula for librtmp2 $VERSION is incomplete."
         return 1
     fi
