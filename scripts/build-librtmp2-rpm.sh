@@ -21,9 +21,9 @@ fi
 
 cargo build --release --locked
 
-test -f target/release/liblibrtmp2.so
-test -f target/release/liblibrtmp2.a
-test -f include/librtmp2/librtmp2.h
+[[ -f target/release/liblibrtmp2.so ]]
+[[ -f target/release/liblibrtmp2.a ]]
+[[ -f include/librtmp2/librtmp2.h ]]
 
 LIBDIR="$(rpm --eval '%{_libdir}')"
 PC_FILE="$RPM_TOPDIR/SOURCES/librtmp2.pc"
