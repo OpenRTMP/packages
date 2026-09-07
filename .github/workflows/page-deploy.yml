@@ -40,6 +40,11 @@ jobs:
             debian \
             ubuntu \
             alpine \
+            rpm \
+            arch \
+            windows \
+            Formula \
+            openrtmp.asc \
             openrtmp.gpg \
             openrtmp-alpine.rsa.pub
           do
