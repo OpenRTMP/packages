@@ -1,5 +1,7 @@
 name: Update librtmp2 Homebrew formula
 
+run-name: Update librtmp2 Homebrew ${{ github.event.inputs.version || github.event.client_payload.version }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -101,6 +103,7 @@ jobs:
                 Name: librtmp2
                 Description: RTMP and RTMPS protocol library
                 Version: #{version}
+                Requires.private: openssl
                 Libs: -L${libdir} -lrtmp2
                 Cflags: -I${includedir}/librtmp2
               EOS
