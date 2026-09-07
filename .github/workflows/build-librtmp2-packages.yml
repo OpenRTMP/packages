@@ -1,5 +1,7 @@
 name: Build librtmp2 APT packages
 
+run-name: Build librtmp2 APT ${{ inputs.version || github.event.client_payload.version }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -61,6 +63,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
         with:
           platforms: all
@@ -69,7 +73,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          test -n "${RAW_VERSION}" || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          [[ -n "${RAW_VERSION:-}" ]] || { echo "No librtmp2 version supplied." >&2; exit 1; }
           echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build packages
@@ -91,13 +95,13 @@ jobs:
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config
               rustup_args=(-y --profile minimal --default-toolchain 1.93.0)
-              if [ "$EXPECTED_ARCHITECTURE" = "i386" ]; then
+              if [[ "$EXPECTED_ARCHITECTURE" == "i386" ]]; then
                 rustup_args+=(--default-host i686-unknown-linux-gnu)
               fi
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
                 | sh -s -- "${rustup_args[@]}"
               export PATH="$HOME/.cargo/bin:$PATH"
-              test "$(dpkg --print-architecture)" = "$EXPECTED_ARCHITECTURE"
+              [[ "$(dpkg --print-architecture)" == "$EXPECTED_ARCHITECTURE" ]]
               cargo --version
               rustc --version
               git clone --depth 1 --branch "v$VERSION" \
@@ -115,7 +119,7 @@ jobs:
   publish:
     name: Update Debian and Ubuntu repositories
     needs: build
-    if: always() && needs.build.result != 'cancelled'
+    if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -131,7 +135,6 @@ jobs:
 
       - name: Download successful package artifacts
         uses: actions/download-artifact@v8
-        continue-on-error: true
         with:
           pattern: librtmp2-*
           path: downloaded-packages
@@ -184,10 +187,10 @@ jobs:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
         shell: bash
         run: |
-          test -n "$APT_GPG_PRIVATE_KEY" || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
+          [[ -n "$APT_GPG_PRIVATE_KEY" ]] || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
           printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
           KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
-          test -n "$KEY_FINGERPRINT"
+          [[ -n "$KEY_FINGERPRINT" ]]
           echo "KEY_FINGERPRINT=$KEY_FINGERPRINT" >> "$GITHUB_ENV"
           gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
           gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
