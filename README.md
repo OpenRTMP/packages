@@ -156,16 +156,18 @@ The formula is updated automatically when a new librtmp2 release is published.
 
 ## Windows
 
-Signed Windows `x86_64` ZIP packages contain the native DLL, import/static
-libraries, C header, README, and license. OpenSSL is linked statically into the
-build. Each ZIP is accompanied by SHA-256 and OpenPGP signature files.
+Signed Windows packages are built for both `x86_64` and `arm64`. Each ZIP
+contains the native DLL, import/static libraries, C header, README, and license.
+OpenSSL is linked statically into both builds. Each ZIP is accompanied by
+SHA-256 and OpenPGP signature files.
 
 PowerShell example for the latest release:
 
 ```powershell
 $version = (Invoke-RestMethod https://api.github.com/repos/OpenRTMP/librtmp2/releases/latest).tag_name.TrimStart('v')
-$base = "https://packages.openrtmp.org/windows/x86_64/$version"
-$file = "librtmp2-$version-windows-x86_64.zip"
+$arch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "arm64" } else { "x86_64" }
+$base = "https://packages.openrtmp.org/windows/$arch/$version"
+$file = "librtmp2-$version-windows-$arch.zip"
 Invoke-WebRequest "$base/$file" -OutFile $file
 Invoke-WebRequest "$base/$file.sha256" -OutFile "$file.sha256"
 Invoke-WebRequest "$base/$file.asc" -OutFile "$file.asc"
@@ -179,4 +181,4 @@ Expand-Archive $file -DestinationPath .
 - RPM/DNF/Zypper: `librtmp2`, `librtmp2-devel`
 - Arch Linux: `librtmp2`
 - Homebrew: `librtmp2`
-- Windows: signed `x86_64` binary ZIP
+- Windows: signed `x86_64` and `arm64` binary ZIPs
