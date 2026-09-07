@@ -43,6 +43,7 @@ class Librtmp2 < Formula
       Name: librtmp2
       Description: RTMP and RTMPS protocol library
       Version: #{version}
+      Requires.private: openssl
       Libs: -L${libdir} -lrtmp2
       Cflags: -I${includedir}/librtmp2
     EOS
