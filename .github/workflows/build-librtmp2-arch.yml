@@ -1,0 +1,200 @@
+name: Build librtmp2 Arch Linux package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [librtmp2-release]
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: librtmp2-arch-repository
+  cancel-in-progress: false
+
+env:
+  RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+jobs:
+  build:
+    name: Arch Linux / x86_64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${RAW_VERSION:-}" || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Arch Linux package
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/arch/x86_64
+          chmod +x scripts/build-librtmp2-arch.sh
+
+          docker run --rm \
+            -e VERSION \
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+            archlinux:base-devel \
+            bash -euxo pipefail -c '
+              pacman -Syu --noconfirm --needed \
+                base-devel ca-certificates cbindgen curl git openssl rust
+              useradd --create-home builder
+              mkdir -p /tmp/package-output
+              chown -R builder:builder /tmp/package-output
+              chmod +x /workspace/scripts/build-librtmp2-arch.sh
+              su - builder -c "VERSION=$VERSION OUTPUT_DIR=/tmp/package-output /workspace/scripts/build-librtmp2-arch.sh"
+              cp /tmp/package-output/*.pkg.tar.zst /workspace/artifact/arch/x86_64/
+            '
+
+      - name: Upload Arch Linux package
+        uses: actions/upload-artifact@v7
+        with:
+          name: librtmp2-arch-x86_64
+          path: artifact
+          if-no-files-found: error
+
+  publish:
+    name: Update Arch Linux repository
+    needs: build
+    if: always() && needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: librtmp2-arch-*
+          path: downloaded-arch
+          merge-multiple: true
+
+      - name: Check for built package
+        id: packages
+        shell: bash
+        run: |
+          if [[ -d downloaded-arch/arch ]] \
+              && find downloaded-arch/arch -type f -name '*.pkg.tar.zst' -print -quit | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "A successful Arch Linux package artifact is available for publishing."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No successful Arch Linux package artifact is available; nothing to publish."
+          fi
+
+      - name: Import signing key
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$APT_GPG_PRIVATE_KEY" || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          test -n "$KEY_FINGERPRINT"
+          echo "KEY_FINGERPRINT=$KEY_FINGERPRINT" >> "$GITHUB_ENV"
+          gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
+          gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
+
+      - name: Sign package
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' package; do
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$APT_GPG_PASSPHRASE" \
+              --local-user "$KEY_FINGERPRINT" \
+              --detach-sign --output "$package.sig" "$package"
+          done < <(find downloaded-arch/arch -type f -name '*.pkg.tar.zst' -print0)
+
+      - name: Publish package and generate repository database
+        if: steps.packages.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p arch
+          cp -a downloaded-arch/arch/. arch/
+
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo" \
+            archlinux:base-devel \
+            bash -euxo pipefail -c '
+              repo-add -R /repo/arch/x86_64/openrtmp.db.tar.gz \
+                /repo/arch/x86_64/*.pkg.tar.zst
+            '
+
+      - name: Sign repository databases
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for database in \
+            arch/x86_64/openrtmp.db.tar.gz \
+            arch/x86_64/openrtmp.files.tar.gz
+          do
+            test -f "$database"
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$APT_GPG_PASSPHRASE" \
+              --local-user "$KEY_FINGERPRINT" \
+              --detach-sign --output "$database.sig" "$database"
+          done
+
+      - name: Commit repository update
+        id: publish
+        if: steps.packages.outputs.available == 'true'
+        env:
+          VERSION: ${{ env.RAW_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add arch openrtmp.asc openrtmp.gpg
+
+          if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "Arch Linux repository is already up to date."
+            exit 0
+          fi
+
+          git commit -m "Publish librtmp2 ${VERSION#v} Arch Linux package"
+          git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
