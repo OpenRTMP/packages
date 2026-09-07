@@ -1,5 +1,7 @@
 name: Build librtmp2 Windows packages
 
+run-name: Build librtmp2 Windows ${{ github.event.inputs.version || github.event.client_payload.version }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -33,6 +35,8 @@ jobs:
     steps:
       - name: Checkout package repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Resolve version
         id: version
@@ -101,6 +105,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           ARCH: ${{ matrix.arch }}
           RUST_TARGET: ${{ matrix.rust_target }}
+          VCPKG_TRIPLET: ${{ matrix.vcpkg_triplet }}
         run: |
           $source = Join-Path $env:GITHUB_WORKSPACE "librtmp2"
           $targetDir = Join-Path $source "target\$env:RUST_TARGET\release"
@@ -122,6 +127,12 @@ jobs:
           Copy-Item (Join-Path $source "README.md") $stage
           Copy-Item (Join-Path $source "LICENSE") $stage
 
+          $opensslLicense = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\$env:VCPKG_TRIPLET\share\openssl\copyright"
+          if (-not (Test-Path $opensslLicense)) {
+            throw "OpenSSL license notice was not found at $opensslLicense."
+          }
+          Copy-Item $opensslLicense (Join-Path $stage "OPENSSL-LICENSE.txt")
+
           $archive = Join-Path $output "$stageName.zip"
           Compress-Archive -Path $stage -DestinationPath $archive -CompressionLevel Optimal
 
@@ -138,7 +149,7 @@ jobs:
   publish:
     name: Update Windows packages
     needs: build
-    if: always() && needs.build.result != 'cancelled'
+    if: needs.build.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -155,7 +166,6 @@ jobs:
 
       - name: Download Windows package artifacts
         uses: actions/download-artifact@v8
-        continue-on-error: true
         with:
           pattern: librtmp2-windows-*
           path: downloaded-windows
@@ -182,10 +192,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$APT_GPG_PRIVATE_KEY" || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
+          [[ -n "$APT_GPG_PRIVATE_KEY" ]] || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
           printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
           KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
-          test -n "$KEY_FINGERPRINT"
+          [[ -n "$KEY_FINGERPRINT" ]]
 
           gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
           gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
