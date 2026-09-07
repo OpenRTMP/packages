@@ -10,10 +10,6 @@ on:
   repository_dispatch:
     types: [librtmp2-release]
 
-permissions:
-  actions: write
-  contents: write
-
 concurrency:
   group: librtmp2-arch-repository
   cancel-in-progress: false
@@ -25,6 +21,8 @@ jobs:
   build:
     name: Arch Linux / x86_64
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout package repository
@@ -74,6 +72,9 @@ jobs:
     needs: build
     if: always() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
     concurrency:
       group: librtmp2-repository-publish
       cancel-in-progress: false
