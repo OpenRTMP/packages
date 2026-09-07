@@ -89,19 +89,24 @@ check_homebrew() {
 
 check_windows() {
     local missing=0
-    local base="windows/x86_64/$VERSION"
-    local package="$base/librtmp2-${VERSION}-windows-x86_64.zip"
+    local arch base package
+    local -a arches=(x86_64 arm64)
 
-    check_file "$package" || missing=1
-    check_file "$package.sha256" || missing=1
-    check_file "$package.asc" || missing=1
+    for arch in "${arches[@]}"; do
+        base="windows/$arch/$VERSION"
+        package="$base/librtmp2-${VERSION}-windows-${arch}.zip"
+
+        check_file "$package" || missing=1
+        check_file "$package.sha256" || missing=1
+        check_file "$package.asc" || missing=1
+    done
 
     if (( missing != 0 )); then
-        echo "Windows package for librtmp2 $VERSION is incomplete."
+        echo "Windows packages for librtmp2 $VERSION are incomplete."
         return 1
     fi
 
-    echo "Windows package for librtmp2 $VERSION is complete."
+    echo "Windows packages for librtmp2 $VERSION are complete."
 }
 
 case "${1:-}" in
