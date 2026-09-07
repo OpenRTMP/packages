@@ -10,10 +10,6 @@ on:
   repository_dispatch:
     types: [librtmp2-release]
 
-permissions:
-  actions: write
-  contents: write
-
 env:
   RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
 
@@ -21,6 +17,8 @@ jobs:
   build:
     name: Windows / ${{ matrix.arch }}
     runs-on: windows-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -142,6 +140,9 @@ jobs:
     needs: build
     if: always() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
     concurrency:
       group: librtmp2-repository-publish
       cancel-in-progress: false
