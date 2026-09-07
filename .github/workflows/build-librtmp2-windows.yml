@@ -89,14 +89,15 @@ jobs:
           $stageName = "librtmp2-$env:VERSION-windows-x86_64"
           $stage = Join-Path $env:RUNNER_TEMP $stageName
 
-          New-Item -ItemType Directory -Force -Path \
-            (Join-Path $stage "bin"), \
-            (Join-Path $stage "lib"), \
-            (Join-Path $stage "include\librtmp2") | Out-Null
+          @(
+            (Join-Path $stage "bin"),
+            (Join-Path $stage "lib"),
+            (Join-Path $stage "include\librtmp2")
+          ) | ForEach-Object { New-Item -ItemType Directory -Force -Path $_ | Out-Null }
           New-Item -ItemType Directory -Force -Path $output | Out-Null
 
           Copy-Item (Join-Path $source "target\release\librtmp2.dll") (Join-Path $stage "bin\")
-          Get-ChildItem (Join-Path $source "target\release") -Filter "librtmp2*.lib" | \
+          Get-ChildItem (Join-Path $source "target\release") -Filter "librtmp2*.lib" |
             Copy-Item -Destination (Join-Path $stage "lib\")
           Copy-Item (Join-Path $source "include\librtmp2\librtmp2.h") (Join-Path $stage "include\librtmp2\")
           Copy-Item (Join-Path $source "README.md") $stage
