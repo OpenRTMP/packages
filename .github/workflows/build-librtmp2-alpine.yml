@@ -1,5 +1,7 @@
 name: Build librtmp2 Alpine packages
 
+run-name: Build librtmp2 Alpine ${{ github.event.inputs.version || github.event.client_payload.version }}
+
 on:
   workflow_dispatch:
     inputs:
