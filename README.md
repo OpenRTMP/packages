@@ -134,7 +134,7 @@ sudo pacman-key --lsign-key "$key"
 sudo tee -a /etc/pacman.conf >/dev/null <<'EOF'
 
 [openrtmp]
-SigLevel = Required DatabaseOptional
+SigLevel = Required DatabaseRequired
 Server = https://packages.openrtmp.org/arch/$arch
 EOF
 
@@ -157,9 +157,13 @@ The formula is updated automatically when a new librtmp2 release is published.
 ## Windows
 
 Signed Windows packages are built for both `x86_64` and `arm64`. Each ZIP
-contains the native DLL, import/static libraries, C header, README, and license.
-OpenSSL is linked statically into both builds. Each ZIP is accompanied by
-SHA-256 and OpenPGP signature files.
+contains the native DLL, import/static libraries, C header, README, librtmp2
+license, and the OpenSSL license notice. OpenSSL is linked statically into both
+builds. Each ZIP is accompanied by SHA-256 and OpenPGP signature files.
+
+The verification example below requires GnuPG (`gpg`) to be installed. The
+trusted OpenRTMP package-signing key fingerprint is
+`615A20712AA690E917D6DCEF75E87340DA09771D`.
 
 PowerShell example for the latest release:
 
@@ -168,9 +172,32 @@ $version = (Invoke-RestMethod https://api.github.com/repos/OpenRTMP/librtmp2/rel
 $arch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq [System.Runtime.InteropServices.Architecture]::Arm64) { "arm64" } else { "x86_64" }
 $base = "https://packages.openrtmp.org/windows/$arch/$version"
 $file = "librtmp2-$version-windows-$arch.zip"
+$keyFile = "openrtmp.asc"
+$trustedFingerprint = "615A20712AA690E917D6DCEF75E87340DA09771D"
+
 Invoke-WebRequest "$base/$file" -OutFile $file
 Invoke-WebRequest "$base/$file.sha256" -OutFile "$file.sha256"
 Invoke-WebRequest "$base/$file.asc" -OutFile "$file.asc"
+Invoke-WebRequest "https://packages.openrtmp.org/openrtmp.asc" -OutFile $keyFile
+
+$expectedHash = ((Get-Content "$file.sha256" -Raw).Trim() -split '\s+')[0].ToLowerInvariant()
+$actualHash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant()
+if ($actualHash -ne $expectedHash) {
+    throw "SHA-256 checksum verification failed."
+}
+
+$keyInfo = & gpg --batch --with-colons --show-keys $keyFile
+$fingerprintLine = $keyInfo | Where-Object { $_ -like 'fpr:*' } | Select-Object -First 1
+$fingerprint = ($fingerprintLine -split ':')[9]
+if ($fingerprint -ne $trustedFingerprint) {
+    throw "OpenRTMP signing key fingerprint verification failed."
+}
+
+& gpg --batch --import $keyFile
+if ($LASTEXITCODE -ne 0) { throw "Failed to import the OpenRTMP signing key." }
+& gpg --batch --verify "$file.asc" $file
+if ($LASTEXITCODE -ne 0) { throw "OpenPGP signature verification failed." }
+
 Expand-Archive $file -DestinationPath .
 ```
 
