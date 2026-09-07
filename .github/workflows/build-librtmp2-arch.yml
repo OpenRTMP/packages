@@ -150,6 +150,10 @@ jobs:
                 /repo/arch/x86_64/*.pkg.tar.zst
             '
 
+          rm -f arch/x86_64/openrtmp.db arch/x86_64/openrtmp.files
+          cp arch/x86_64/openrtmp.db.tar.gz arch/x86_64/openrtmp.db
+          cp arch/x86_64/openrtmp.files.tar.gz arch/x86_64/openrtmp.files
+
       - name: Sign repository databases
         if: steps.packages.outputs.available == 'true'
         env:
