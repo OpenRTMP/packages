@@ -36,6 +36,7 @@ includedir=\${prefix}/include
 Name: librtmp2
 Description: RTMP and RTMPS protocol library
 Version: $VERSION
+Requires.private: openssl
 Libs: -L\${libdir} -lrtmp2
 Cflags: -I\${includedir}/librtmp2
 EOF
