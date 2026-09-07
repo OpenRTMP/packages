@@ -1,0 +1,259 @@
+name: Build librtmp2 RPM packages
+
+run-name: Build librtmp2 RPM ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [librtmp2-release]
+
+concurrency:
+  group: librtmp2-rpm-repository
+  cancel-in-progress: false
+
+env:
+  RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+jobs:
+  build:
+    name: ${{ matrix.family }} ${{ matrix.release }} / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { family: fedora, release: "44", image: "fedora:44", arch: x86_64, platform: "linux/amd64", release_tag: fc44 }
+          - { family: fedora, release: "44", image: "fedora:44", arch: aarch64, platform: "linux/arm64", release_tag: fc44 }
+          - { family: fedora, release: "44", image: "fedora:44", arch: ppc64le, platform: "linux/ppc64le", release_tag: fc44 }
+          - { family: fedora, release: "44", image: "fedora:44", arch: s390x, platform: "linux/s390x", release_tag: fc44 }
+          - { family: el, release: "9", image: "almalinux:9", arch: x86_64, platform: "linux/amd64", release_tag: el9 }
+          - { family: el, release: "9", image: "almalinux:9", arch: aarch64, platform: "linux/arm64", release_tag: el9 }
+          - { family: el, release: "9", image: "almalinux:9", arch: ppc64le, platform: "linux/ppc64le", release_tag: el9 }
+          - { family: el, release: "9", image: "almalinux:9", arch: s390x, platform: "linux/s390x", release_tag: el9 }
+          - { family: el, release: "10", image: "almalinux:10", arch: x86_64, platform: "linux/amd64", release_tag: el10 }
+          - { family: el, release: "10", image: "almalinux:10", arch: aarch64, platform: "linux/arm64", release_tag: el10 }
+          - { family: el, release: "10", image: "almalinux:10", arch: ppc64le, platform: "linux/ppc64le", release_tag: el10 }
+          - { family: el, release: "10", image: "almalinux:10", arch: s390x, platform: "linux/s390x", release_tag: el10 }
+          - { family: opensuse, release: "16.0", image: "opensuse/leap:16.0", arch: x86_64, platform: "linux/amd64", release_tag: suse160 }
+          - { family: opensuse, release: "16.0", image: "opensuse/leap:16.0", arch: aarch64, platform: "linux/arm64", release_tag: suse160 }
+          - { family: opensuse, release: "16.0", image: "opensuse/leap:16.0", arch: ppc64le, platform: "linux/ppc64le", release_tag: suse160 }
+          - { family: opensuse, release: "16.0", image: "opensuse/leap:16.0", arch: s390x, platform: "linux/s390x", release_tag: suse160 }
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        with:
+          platforms: all
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${RAW_VERSION:-}" ]] || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build RPM packages
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          FAMILY: ${{ matrix.family }}
+          RELEASE: ${{ matrix.release }}
+          RELEASE_TAG: ${{ matrix.release_tag }}
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          output="artifact/rpm/$FAMILY/$RELEASE/$EXPECTED_ARCH"
+          mkdir -p "$output"
+          chmod +x scripts/build-librtmp2-rpm.sh
+
+          docker run --rm --platform "$PLATFORM" \
+            -e VERSION -e FAMILY -e RELEASE -e RELEASE_TAG -e EXPECTED_ARCH \
+            -e SOURCE_DIR=/workspace/librtmp2 \
+            -e OUTPUT_DIR="/workspace/$output" \
+            -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
+            bash -euxo pipefail -c '
+              if command -v dnf >/dev/null 2>&1; then
+                dnf install -y \
+                  ca-certificates curl gcc git gzip make openssl-devel \
+                  pkgconf-pkg-config rpm-build tar
+              elif command -v zypper >/dev/null 2>&1; then
+                zypper --non-interactive refresh
+                zypper --non-interactive install --no-recommends \
+                  ca-certificates curl gcc git gzip libopenssl-devel make \
+                  pkg-config rpm-build tar
+              else
+                echo "No supported RPM-family package manager found." >&2
+                exit 1
+              fi
+
+              rustup_args=(-y --profile minimal --default-toolchain 1.93.0)
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
+                | sh -s -- "${rustup_args[@]}"
+              export PATH="$HOME/.cargo/bin:$PATH"
+
+              actual_arch="$(rpm --eval "%{_arch}")"
+              [[ "$actual_arch" == "$EXPECTED_ARCH" ]] || {
+                echo "Expected RPM architecture $EXPECTED_ARCH, got $actual_arch." >&2
+                exit 1
+              }
+
+              git clone --depth 1 --branch "v$VERSION" \
+                https://github.com/OpenRTMP/librtmp2.git "$SOURCE_DIR"
+              /workspace/scripts/build-librtmp2-rpm.sh
+            '
+
+      - name: Upload RPM packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: librtmp2-rpm-${{ matrix.family }}-${{ matrix.release }}-${{ matrix.arch }}
+          path: artifact
+          if-no-files-found: error
+
+  publish:
+    name: Update RPM repositories
+    needs: build
+    if: needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Download successful package artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: librtmp2-rpm-*
+          path: downloaded-rpm
+          merge-multiple: true
+
+      - name: Check for built packages
+        id: packages
+        shell: bash
+        run: |
+          if [[ -d downloaded-rpm/rpm ]] \
+              && find downloaded-rpm/rpm -type f -name '*.rpm' -print -quit | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Successful RPM package artifacts are available for publishing."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No successful RPM package artifacts are available; nothing to publish."
+          fi
+
+      - name: Install repository tools
+        if: steps.packages.outputs.available == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y createrepo-c gnupg rpm
+
+      - name: Import signing key
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$APT_GPG_PRIVATE_KEY" ]] || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          [[ -n "$KEY_FINGERPRINT" ]]
+          echo "KEY_FINGERPRINT=$KEY_FINGERPRINT" >> "$GITHUB_ENV"
+          gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
+          gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
+
+      - name: Sign RPM packages
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          passfile="$RUNNER_TEMP/rpm-gpg-passphrase"
+          printf '%s' "$APT_GPG_PASSPHRASE" > "$passfile"
+          chmod 600 "$passfile"
+          trap 'rm -f "$passfile"' EXIT
+
+          signer="$(command -v rpmsign || command -v rpm)"
+          while IFS= read -r -d '' package; do
+            "$signer" \
+              --define "_gpg_name $KEY_FINGERPRINT" \
+              --define "_gpg_sign_cmd_extra_args --batch --pinentry-mode loopback --passphrase-file $passfile" \
+              --addsign "$package"
+          done < <(find downloaded-rpm/rpm -type f -name '*.rpm' -print0)
+
+      - name: Publish packages and repository metadata
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p rpm
+          cp -a downloaded-rpm/rpm/. rpm/
+
+          find downloaded-rpm/rpm -type f -name '*.rpm' -printf '%h\n' \
+            | sed 's#^downloaded-rpm/##' \
+            | sort -u \
+            | while IFS= read -r directory; do
+                createrepo_c --update "$directory"
+                rm -f "$directory/repodata/repomd.xml.asc"
+                gpg --batch --yes --pinentry-mode loopback \
+                  --passphrase "$APT_GPG_PASSPHRASE" \
+                  --local-user "$KEY_FINGERPRINT" \
+                  --armor --detach-sign \
+                  --output "$directory/repodata/repomd.xml.asc" \
+                  "$directory/repodata/repomd.xml"
+              done
+
+      - name: Commit repository update
+        id: publish
+        if: steps.packages.outputs.available == 'true'
+        env:
+          VERSION: ${{ env.RAW_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rpm openrtmp.asc openrtmp.gpg
+
+          if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "RPM repositories are already up to date."
+            exit 0
+          fi
+
+          git commit -m "Publish librtmp2 ${VERSION#v} RPM packages"
+          git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
