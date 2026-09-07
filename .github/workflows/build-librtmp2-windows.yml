@@ -1,0 +1,215 @@
+name: Build librtmp2 Windows package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [librtmp2-release]
+
+permissions:
+  actions: write
+  contents: write
+
+env:
+  RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+jobs:
+  build:
+    name: Windows / x86_64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:RAW_VERSION)) {
+            throw "No librtmp2 version supplied."
+          }
+          $version = $env:RAW_VERSION.TrimStart('v')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Install Rust toolchain
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.93.0 --profile minimal
+          rustup default 1.93.0
+          rustc --version
+          cargo --version
+
+      - name: Install static OpenSSL
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:VCPKG_INSTALLATION_ROOT)) {
+            throw "VCPKG_INSTALLATION_ROOT is not available on this runner."
+          }
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install openssl:x64-windows-static-md
+
+      - name: Build librtmp2
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "librtmp2"
+          git clone --depth 1 --branch "v$env:VERSION" https://github.com/OpenRTMP/librtmp2.git $source
+          Set-Location $source
+
+          $env:OPENSSL_DIR = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\x64-windows-static-md"
+          $env:OPENSSL_STATIC = "1"
+
+          cargo install --locked cbindgen
+          New-Item -ItemType Directory -Force -Path "include\librtmp2" | Out-Null
+          if (-not (Test-Path "include\librtmp2\librtmp2.h")) {
+            cbindgen --lang c --cpp-compat --crate librtmp2 --output "include\librtmp2\librtmp2.h"
+          }
+
+          cargo build --release --locked
+
+          if (-not (Test-Path "target\release\librtmp2.dll")) {
+            throw "target\release\librtmp2.dll was not produced."
+          }
+          if (-not (Get-ChildItem "target\release" -Filter "librtmp2*.lib" -ErrorAction SilentlyContinue)) {
+            throw "No librtmp2 import/static library was produced."
+          }
+
+      - name: Create Windows package
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $source = Join-Path $env:GITHUB_WORKSPACE "librtmp2"
+          $output = Join-Path $env:GITHUB_WORKSPACE "artifact\windows\x86_64\$env:VERSION"
+          $stageName = "librtmp2-$env:VERSION-windows-x86_64"
+          $stage = Join-Path $env:RUNNER_TEMP $stageName
+
+          New-Item -ItemType Directory -Force -Path \
+            (Join-Path $stage "bin"), \
+            (Join-Path $stage "lib"), \
+            (Join-Path $stage "include\librtmp2") | Out-Null
+          New-Item -ItemType Directory -Force -Path $output | Out-Null
+
+          Copy-Item (Join-Path $source "target\release\librtmp2.dll") (Join-Path $stage "bin\")
+          Get-ChildItem (Join-Path $source "target\release") -Filter "librtmp2*.lib" | \
+            Copy-Item -Destination (Join-Path $stage "lib\")
+          Copy-Item (Join-Path $source "include\librtmp2\librtmp2.h") (Join-Path $stage "include\librtmp2\")
+          Copy-Item (Join-Path $source "README.md") $stage
+          Copy-Item (Join-Path $source "LICENSE") $stage
+
+          $archive = Join-Path $output "$stageName.zip"
+          Compress-Archive -Path $stage -DestinationPath $archive -CompressionLevel Optimal
+
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          "$hash  $stageName.zip" | Set-Content -Encoding ascii "$archive.sha256"
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v7
+        with:
+          name: librtmp2-windows-x86_64
+          path: artifact
+          if-no-files-found: error
+
+  publish:
+    name: Update Windows packages
+    needs: build
+    if: always() && needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Download Windows package artifact
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          pattern: librtmp2-windows-*
+          path: downloaded-windows
+          merge-multiple: true
+
+      - name: Check for built package
+        id: packages
+        shell: bash
+        run: |
+          if [[ -d downloaded-windows/windows ]] \
+              && find downloaded-windows/windows -type f -name '*.zip' -print -quit | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "A successful Windows package artifact is available for publishing."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No successful Windows package artifact is available; nothing to publish."
+          fi
+
+      - name: Import signing key and sign package
+        if: steps.packages.outputs.available == 'true'
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$APT_GPG_PRIVATE_KEY" || { echo "APT_GPG_PRIVATE_KEY is required." >&2; exit 1; }
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          KEY_FINGERPRINT="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          test -n "$KEY_FINGERPRINT"
+
+          gpg --batch --yes --armor --export "$KEY_FINGERPRINT" > openrtmp.asc
+          gpg --batch --yes --export "$KEY_FINGERPRINT" > openrtmp.gpg
+
+          while IFS= read -r -d '' package; do
+            gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "$APT_GPG_PASSPHRASE" \
+              --local-user "$KEY_FINGERPRINT" \
+              --armor --detach-sign \
+              --output "$package.asc" "$package"
+          done < <(find downloaded-windows/windows -type f -name '*.zip' -print0)
+
+      - name: Publish Windows package
+        if: steps.packages.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p windows
+          cp -a downloaded-windows/windows/. windows/
+
+      - name: Commit repository update
+        id: publish
+        if: steps.packages.outputs.available == 'true'
+        env:
+          VERSION: ${{ env.RAW_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add windows openrtmp.asc openrtmp.gpg
+
+          if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "Windows packages are already up to date."
+            exit 0
+          fi
+
+          git commit -m "Publish librtmp2 ${VERSION#v} Windows package"
+          git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main
