@@ -176,6 +176,15 @@ jobs:
               --notes "Precompiled Homebrew bottles for librtmp2 $VERSION. These assets back the bottle do block in Formula/librtmp2.rb and are not meant to be downloaded directly." \
               --latest=false
           fi
+
+          # `brew bottle` names its output with a double dash
+          # (librtmp2--0.8.0...), but `brew install` requests the bottle
+          # from root_url using a single dash (librtmp2-0.8.0...) -
+          # rename to match what it will actually fetch.
+          for bottle in bottles/*.tar.gz; do
+            mv "$bottle" "${bottle/--/-}"
+          done
+
           gh release upload "$tag" bottles/*.tar.gz \
             --repo "$GITHUB_REPOSITORY" --clobber
 
