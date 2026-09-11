@@ -62,12 +62,16 @@ jobs:
 
       - name: Build and bottle librtmp2
         id: bottle
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
           brew install --formula --build-bottle openrtmp/packages/librtmp2
           brew test openrtmp/packages/librtmp2
-          brew bottle --no-rebuild --json openrtmp/packages/librtmp2
+          brew bottle --no-rebuild --json \
+            --root-url "https://github.com/OpenRTMP/packages/releases/download/librtmp2-v${VERSION}-homebrew" \
+            openrtmp/packages/librtmp2
 
           json="$(find . -maxdepth 1 -name 'librtmp2--*.json' -print -quit)"
           tarball="$(find . -maxdepth 1 -name 'librtmp2--*.tar.gz' -print -quit)"
