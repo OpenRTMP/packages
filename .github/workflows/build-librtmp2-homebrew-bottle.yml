@@ -130,9 +130,11 @@ jobs:
             echo "No bottle artifacts are available; nothing to publish."
           fi
 
-      - name: Tap this checkout
+      - name: Tap and trust this checkout
         if: steps.bottles.outputs.available == 'true'
-        run: brew tap openrtmp/packages "$PWD"
+        run: |
+          brew tap openrtmp/packages "$PWD"
+          brew trust --formula openrtmp/packages/librtmp2
 
       - name: Merge bottle metadata into formula
         if: steps.bottles.outputs.available == 'true'
