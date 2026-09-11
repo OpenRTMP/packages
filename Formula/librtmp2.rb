@@ -5,6 +5,13 @@ class Librtmp2 < Formula
   sha256 "8e1be00972fa6f8c8b5452ed64189c7335ff5ce88f3779cdbb7d518b7af33a7b"
   license "MIT"
 
+  bottle do
+    sha256 cellar: :any, arm64_golden_gate: "157eabbfc9209e3b6f4ef033e300b93a20838f2209e2ffb4a72c48d03108346d"
+    sha256 cellar: :any, arm64_tahoe:       "bb52af4a6e52f2d11442d7e70b61510dfa5b378690c20eb77bac99050cab2c54"
+    sha256 cellar: :any, arm64_sequoia:     "30f7a787710714d17ee385530d0d71826e381641e5e3c6c45e0c19954426b7b0"
+    sha256 cellar: :any, arm64_sonoma:      "67770da86bef568908092233db8360533f25c04f4f0abd4bc701ea3df6e9feb2"
+  end
+
   depends_on "cbindgen" => :build
   depends_on "pkgconf" => :build
   depends_on "rust" => :build
