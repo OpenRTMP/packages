@@ -73,7 +73,9 @@ jobs:
             def install
               ENV["OPENSSL_DIR"] = Formula["openssl@3"].opt_prefix
 
-              system "cargo", "build", "--release", "--locked"
+              # The release source tarball ships no Cargo.lock (Rust library crates
+              # don't commit one), so --locked would abort instead of resolving it.
+              system "cargo", "build", "--release"
 
               unless File.exist?("include/librtmp2/librtmp2.h")
                 mkdir_p "include/librtmp2"

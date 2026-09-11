@@ -19,7 +19,9 @@ if [[ ! -f include/librtmp2/librtmp2.h ]]; then
         --output include/librtmp2/librtmp2.h
 fi
 
-cargo build --release --locked
+# The tagged source archive ships no Cargo.lock (library crates don't
+# commit one), so --locked would abort instead of resolving it.
+cargo build --release
 
 [[ -f target/release/liblibrtmp2.so ]]
 [[ -f target/release/liblibrtmp2.a ]]

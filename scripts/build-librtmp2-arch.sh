@@ -30,7 +30,7 @@ sha256sums=('@SHA256@')
 options=('!debug')
 
 build() {
-    cd "$srcdir"/librtmp2-*
+    cd "$srcdir/librtmp2-$pkgver"
 
     if [[ ! -f include/librtmp2/librtmp2.h ]]; then
         mkdir -p include/librtmp2
@@ -38,11 +38,13 @@ build() {
             --output include/librtmp2/librtmp2.h
     fi
 
-    cargo build --release --locked
+    # The tagged source archive ships no Cargo.lock (library crates don't
+    # commit one), so --locked would abort instead of resolving it.
+    cargo build --release
 }
 
 package() {
-    cd "$srcdir"/librtmp2-*
+    cd "$srcdir/librtmp2-$pkgver"
 
     install -Dm755 target/release/liblibrtmp2.so \
         "$pkgdir/usr/lib/librtmp2.so"

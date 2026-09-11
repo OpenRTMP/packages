@@ -24,6 +24,7 @@ jobs:
       rpm_needed: ${{ steps.status.outputs.rpm_needed }}
       arch_needed: ${{ steps.status.outputs.arch_needed }}
       homebrew_needed: ${{ steps.status.outputs.homebrew_needed }}
+      homebrew_bottle_needed: ${{ steps.status.outputs.homebrew_bottle_needed }}
       windows_needed: ${{ steps.status.outputs.windows_needed }}
 
     steps:
@@ -115,6 +116,7 @@ jobs:
           target_status rpm build-librtmp2-rpm.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 RPM"
           target_status arch build-librtmp2-arch.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Arch"
           target_status homebrew update-librtmp2-homebrew.yml scripts/check-librtmp2-additional-package-completeness.sh "Update librtmp2 Homebrew"
+          target_status homebrew_bottle build-librtmp2-homebrew-bottle.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Homebrew Bottle"
           target_status windows build-librtmp2-windows.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Windows"
 
   dispatch-apt:
@@ -187,6 +189,20 @@ jobs:
           VERSION: ${{ needs.check.outputs.version }}
         run: gh workflow run update-librtmp2-homebrew.yml --repo "$GITHUB_REPOSITORY" --ref main -f version="$VERSION"
 
+  dispatch-homebrew-bottle:
+    name: Start Homebrew bottle workflow
+    needs: check
+    if: needs.check.outputs.homebrew_bottle_needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch Homebrew bottle build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: gh workflow run build-librtmp2-homebrew-bottle.yml --repo "$GITHUB_REPOSITORY" --ref main -f version="$VERSION"
+
   dispatch-windows:
     name: Start Windows package workflow
     needs: check
@@ -210,6 +226,7 @@ jobs:
       - dispatch-rpm
       - dispatch-arch
       - dispatch-homebrew
+      - dispatch-homebrew-bottle
       - dispatch-windows
     if: always()
     runs-on: ubuntu-latest
@@ -228,6 +245,7 @@ jobs:
             echo "- RPM build required: \`${{ needs.check.outputs.rpm_needed }}\`"
             echo "- Arch Linux build required: \`${{ needs.check.outputs.arch_needed }}\`"
             echo "- Homebrew update required: \`${{ needs.check.outputs.homebrew_needed }}\`"
+            echo "- Homebrew bottle build required: \`${{ needs.check.outputs.homebrew_bottle_needed }}\`"
             echo "- Windows build required: \`${{ needs.check.outputs.windows_needed }}\`"
             echo
             echo "A target is considered published only when its configured package artifacts and repository metadata are present."

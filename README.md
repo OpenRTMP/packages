@@ -152,7 +152,23 @@ brew tap openrtmp/packages https://github.com/OpenRTMP/packages
 brew install openrtmp/packages/librtmp2
 ```
 
+Run the `brew tap` command with the explicit URL first. `brew install
+openrtmp/packages/librtmp2` on its own will try to auto-tap using
+Homebrew's default naming convention (`homebrew-packages`), which doesn't
+exist and fails to clone.
+
+Homebrew 6.0+ requires third-party taps to be trusted before their
+formulae are loaded ([Tap Trust](https://docs.brew.sh/Tap-Trust)), so
+`brew tap` may print `Invalid formula` / `untrusted tap` warnings the
+first time — this is expected. Installing the fully qualified formula
+name (`brew install openrtmp/packages/librtmp2`) trusts just that
+formula automatically. To trust the whole tap up front instead, run
+`brew trust openrtmp/packages`.
+
 The formula is updated automatically when a new librtmp2 release is published.
+On macOS Sequoia and Tahoe (arm64), `brew install` fetches a precompiled
+bottle instead of building from source; other platforms build librtmp2
+locally.
 
 ## Windows
 
