@@ -29,8 +29,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { macos: sonoma, tag: arm64_sonoma, runner: macos-14 }
           - { macos: sequoia, tag: arm64_sequoia, runner: macos-15 }
           - { macos: tahoe, tag: arm64_tahoe, runner: macos-26 }
+          - { macos: golden_gate, tag: arm64_golden_gate, runner: xcode-27 }
 
     steps:
       - name: Checkout package repository
