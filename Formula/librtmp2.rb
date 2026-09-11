@@ -6,10 +6,11 @@ class Librtmp2 < Formula
   license "MIT"
 
   bottle do
-    sha256 cellar: :any, arm64_golden_gate: "157eabbfc9209e3b6f4ef033e300b93a20838f2209e2ffb4a72c48d03108346d"
-    sha256 cellar: :any, arm64_tahoe:       "bb52af4a6e52f2d11442d7e70b61510dfa5b378690c20eb77bac99050cab2c54"
-    sha256 cellar: :any, arm64_sequoia:     "30f7a787710714d17ee385530d0d71826e381641e5e3c6c45e0c19954426b7b0"
-    sha256 cellar: :any, arm64_sonoma:      "67770da86bef568908092233db8360533f25c04f4f0abd4bc701ea3df6e9feb2"
+    root_url "https://github.com/OpenRTMP/packages/releases/download/librtmp2-v0.8.0-homebrew"
+    sha256 cellar: :any, arm64_golden_gate: "6f9a49d3e0336aa66afbe76e467b98493d777b3ae31d848b708c2375a1c9b392"
+    sha256 cellar: :any, arm64_tahoe:       "fcad22a037f4e73dddea844b42d5ce74397e2cd35b11fee027944a02cb5b4e4c"
+    sha256 cellar: :any, arm64_sequoia:     "399faa27d261e5fca9bb74fdcbab9deadd8c1e25a0912a82bb53e831dfbc1a31"
+    sha256 cellar: :any, arm64_sonoma:      "c0bab319e2e0f4b246c04b25f982f7a151625bfabf333acb62f14cee29fad7f7"
   end
 
   depends_on "cbindgen" => :build
