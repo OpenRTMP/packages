@@ -7,10 +7,12 @@ class Librtmp2 < Formula
 
   bottle do
     root_url "https://packages.openrtmp.org/homebrew/librtmp2/0.8.0"
-    sha256 cellar: :any, arm64_golden_gate: "bd55184690a1dd343b187b270299f736303ba0ee6c7ec8e4d9991a4a48ffe187"
-    sha256 cellar: :any, arm64_tahoe:       "ec89932345414ae54bfb65d19afa13980838489955b9e8c68c19768a36608649"
-    sha256 cellar: :any, arm64_sequoia:     "66348efcace2a9312f10b336f2b17ddfb0bcb54e62086691fd3e606b6a1019f5"
-    sha256 cellar: :any, arm64_sonoma:      "aa4bc8d30b0ddf422dce84cec2077bcdcaf30b30cd1b25af0f5a3bdd8c8a0c98"
+    sha256 cellar: :any, arm64_golden_gate: "2f69b98a1b753f17b00b636f932df4fc98c7cc50324267d86bf50deedfef1c5c"
+    sha256 cellar: :any, arm64_tahoe:       "975c9366f2f503f0e30aea0c4f176361a345aa3018df986bbb051c1e47afa8e2"
+    sha256 cellar: :any, arm64_sequoia:     "08b3f0fa7e895cfbcdfb239af1720e1f22b5cae6b85c5adb8c7bce4f659f644b"
+    sha256 cellar: :any, arm64_sonoma:      "83b0097e23b2d864d56a5bc6dbc09efaa005924a45b6ff459e4f9829f89d5f63"
+    sha256 cellar: :any, tahoe:             "a4ae292ba79d7941e10b442de6cf4c3025597d802e946f9280f95e8675ddc0ba"
+    sha256 cellar: :any, sequoia:           "e0a36fc952e5506eeca01865079a43240422d63935b0aabeaf43023289a552bd"
   end
 
   depends_on "cbindgen" => :build
