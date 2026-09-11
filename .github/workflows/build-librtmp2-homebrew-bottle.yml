@@ -33,6 +33,8 @@ jobs:
           - { macos: sequoia, tag: arm64_sequoia, runner: macos-15 }
           - { macos: tahoe, tag: arm64_tahoe, runner: macos-26 }
           - { macos: golden_gate, tag: arm64_golden_gate, runner: xcode-27 }
+          - { macos: sequoia, tag: sequoia, runner: macos-15-intel }
+          - { macos: tahoe, tag: tahoe, runner: macos-26-intel }
 
     steps:
       - name: Checkout package repository

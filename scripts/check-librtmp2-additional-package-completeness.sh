@@ -99,7 +99,7 @@ check_homebrew_bottle() {
         missing=1
     fi
 
-    for tag in arm64_sonoma arm64_sequoia arm64_tahoe arm64_golden_gate; do
+    for tag in arm64_sonoma arm64_sequoia arm64_tahoe arm64_golden_gate sequoia tahoe; do
         check_file "$base/librtmp2-${VERSION}.${tag}.bottle.tar.gz" || missing=1
     done
 
