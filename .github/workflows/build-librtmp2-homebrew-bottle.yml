@@ -70,7 +70,7 @@ jobs:
           brew install --formula --build-bottle openrtmp/packages/librtmp2
           brew test openrtmp/packages/librtmp2
           brew bottle --no-rebuild --json \
-            --root-url "https://github.com/OpenRTMP/packages/releases/download/librtmp2-v${VERSION}-homebrew" \
+            --root-url "https://packages.openrtmp.org/homebrew/librtmp2/${VERSION}" \
             openrtmp/packages/librtmp2
 
           json="$(find . -maxdepth 1 -name 'librtmp2--*.json' -print -quit)"
@@ -98,6 +98,7 @@ jobs:
     if: needs.build.result == 'success'
     runs-on: macos-26
     permissions:
+      actions: write
       contents: write
     concurrency:
       group: librtmp2-repository-publish
@@ -153,42 +154,32 @@ jobs:
             cd bottles
             brew bottle \
               --merge --write --no-commit \
-              --root-url "https://github.com/OpenRTMP/packages/releases/download/librtmp2-v${VERSION}-homebrew" \
+              --root-url "https://packages.openrtmp.org/homebrew/librtmp2/${VERSION}" \
               ./*.json
           )
 
           tap_formula="$(brew --repo openrtmp/packages)/Formula/librtmp2.rb"
           cp "$tap_formula" Formula/librtmp2.rb
 
-      - name: Publish release with bottle assets
+      - name: Move bottles into the package repository
         if: steps.bottles.outputs.available == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
-          tag="librtmp2-v${VERSION}-homebrew"
-          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$tag" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "librtmp2 $VERSION Homebrew bottles" \
-              --notes "Precompiled Homebrew bottles for librtmp2 $VERSION. These assets back the bottle do block in Formula/librtmp2.rb and are not meant to be downloaded directly." \
-              --latest=false
-          fi
+          dest="homebrew/librtmp2/${VERSION}"
+          mkdir -p "$dest"
 
           # `brew bottle` names its output with a double dash
           # (librtmp2--0.8.0...), but `brew install` requests the bottle
           # from root_url using a single dash (librtmp2-0.8.0...) -
           # rename to match what it will actually fetch.
           for bottle in bottles/*.tar.gz; do
-            mv "$bottle" "${bottle/--/-}"
+            mv "$bottle" "$dest/$(basename "${bottle/--/-}")"
           done
 
-          gh release upload "$tag" bottles/*.tar.gz \
-            --repo "$GITHUB_REPOSITORY" --clobber
-
-      - name: Commit formula update
+      - name: Commit formula and bottle update
         id: publish
         if: steps.bottles.outputs.available == 'true'
         env:
@@ -198,7 +189,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/librtmp2.rb
+          git add Formula/librtmp2.rb "homebrew/librtmp2/${VERSION}"
 
           if git diff --cached --quiet; then
             echo "published=false" >> "$GITHUB_OUTPUT"
@@ -209,3 +200,12 @@ jobs:
           git commit -m "Publish Homebrew bottles for librtmp2 $VERSION"
           git push origin main
           echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy updated repository to Pages
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run page-deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main

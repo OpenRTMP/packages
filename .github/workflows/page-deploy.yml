@@ -43,6 +43,7 @@ jobs:
             rpm \
             arch \
             windows \
+            homebrew \
             Formula \
             openrtmp.asc \
             openrtmp.gpg \

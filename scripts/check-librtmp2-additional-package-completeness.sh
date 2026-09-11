@@ -90,8 +90,20 @@ check_homebrew() {
 }
 
 check_homebrew_bottle() {
+    local missing=0
+    local base="homebrew/librtmp2/${VERSION}"
+    local tag
+
     if [[ ! -f "$ROOT_DIR/Formula/librtmp2.rb" ]] \
-        || ! grep -Fq "librtmp2-v${VERSION}-homebrew" "$ROOT_DIR/Formula/librtmp2.rb"; then
+        || ! grep -Fq "https://packages.openrtmp.org/homebrew/librtmp2/${VERSION}" "$ROOT_DIR/Formula/librtmp2.rb"; then
+        missing=1
+    fi
+
+    for tag in arm64_sonoma arm64_sequoia arm64_tahoe arm64_golden_gate; do
+        check_file "$base/librtmp2-${VERSION}.${tag}.bottle.tar.gz" || missing=1
+    done
+
+    if (( missing != 0 )); then
         echo "Homebrew bottles for librtmp2 $VERSION are incomplete."
         return 1
     fi
