@@ -1,0 +1,194 @@
+name: Build librtmp2 Homebrew Bottle
+
+run-name: Build librtmp2 Homebrew Bottle ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [librtmp2-release]
+
+concurrency:
+  group: librtmp2-homebrew-bottle-repository
+  cancel-in-progress: false
+
+env:
+  RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+
+jobs:
+  build:
+    name: ${{ matrix.macos }} (${{ matrix.tag }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { macos: sequoia, tag: arm64_sequoia, runner: macos-15 }
+          - { macos: tahoe, tag: arm64_tahoe, runner: macos-26 }
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${RAW_VERSION:-}" ]] || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Homebrew formula targets this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/check-librtmp2-additional-package-completeness.sh
+          scripts/check-librtmp2-additional-package-completeness.sh homebrew
+
+      - name: Tap this checkout
+        run: brew tap openrtmp/packages "$PWD"
+
+      - name: Build and bottle librtmp2
+        id: bottle
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install --formula --build-bottle openrtmp/packages/librtmp2
+          brew test openrtmp/packages/librtmp2
+          brew bottle --no-rebuild --json openrtmp/packages/librtmp2
+
+          json="$(find . -maxdepth 1 -name 'librtmp2--*.json' -print -quit)"
+          tarball="$(find . -maxdepth 1 -name 'librtmp2--*.tar.gz' -print -quit)"
+          [[ -n "$json" && -n "$tarball" ]] || {
+            echo "brew bottle did not produce the expected tarball/json." >&2
+            exit 1
+          }
+
+          echo "json=$json" >> "$GITHUB_OUTPUT"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Upload bottle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: librtmp2-bottle-${{ matrix.tag }}
+          path: |
+            ${{ steps.bottle.outputs.tarball }}
+            ${{ steps.bottle.outputs.json }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish Homebrew bottles
+    needs: build
+    if: needs.build.result == 'success'
+    runs-on: macos-15
+    permissions:
+      contents: write
+    concurrency:
+      group: librtmp2-repository-publish
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout package repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${RAW_VERSION:-}" ]] || { echo "No librtmp2 version supplied." >&2; exit 1; }
+          echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download bottle artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: librtmp2-bottle-*
+          path: bottles
+          merge-multiple: true
+
+      - name: Check for built bottles
+        id: bottles
+        shell: bash
+        run: |
+          if find bottles -maxdepth 1 -name '*.tar.gz' -print -quit | grep -q .; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Bottle artifacts are available for publishing."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No bottle artifacts are available; nothing to publish."
+          fi
+
+      - name: Tap this checkout
+        if: steps.bottles.outputs.available == 'true'
+        run: brew tap openrtmp/packages "$PWD"
+
+      - name: Merge bottle metadata into formula
+        if: steps.bottles.outputs.available == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd bottles
+            brew bottle \
+              --merge --write --no-commit \
+              --root-url "https://github.com/OpenRTMP/packages/releases/download/librtmp2-v${VERSION}-homebrew" \
+              ./*.json
+          )
+
+          tap_formula="$(brew --repo openrtmp/packages)/Formula/librtmp2.rb"
+          cp "$tap_formula" Formula/librtmp2.rb
+
+      - name: Publish release with bottle assets
+        if: steps.bottles.outputs.available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="librtmp2-v${VERSION}-homebrew"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "librtmp2 $VERSION Homebrew bottles" \
+              --notes "Precompiled Homebrew bottles for librtmp2 $VERSION. These assets back the bottle do block in Formula/librtmp2.rb and are not meant to be downloaded directly." \
+              --latest=false
+          fi
+          gh release upload "$tag" bottles/*.tar.gz \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Commit formula update
+        id: publish
+        if: steps.bottles.outputs.available == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/librtmp2.rb
+
+          if git diff --cached --quiet; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            echo "Homebrew bottle metadata is already up to date."
+            exit 0
+          fi
+
+          git commit -m "Publish Homebrew bottles for librtmp2 $VERSION"
+          git push origin main
+          echo "published=true" >> "$GITHUB_OUTPUT"

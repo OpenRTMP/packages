@@ -5,7 +5,7 @@ VERSION="${VERSION:?VERSION is required}"
 ROOT_DIR="${ROOT_DIR:-$PWD}"
 
 usage() {
-    echo "Usage: $0 <rpm|arch|homebrew|windows>" >&2
+    echo "Usage: $0 <rpm|arch|homebrew|homebrew_bottle|windows>" >&2
     exit 2
 }
 
@@ -89,6 +89,16 @@ check_homebrew() {
     echo "Homebrew formula for librtmp2 $VERSION is complete."
 }
 
+check_homebrew_bottle() {
+    if [[ ! -f "$ROOT_DIR/Formula/librtmp2.rb" ]] \
+        || ! grep -Fq "librtmp2-v${VERSION}-homebrew" "$ROOT_DIR/Formula/librtmp2.rb"; then
+        echo "Homebrew bottles for librtmp2 $VERSION are incomplete."
+        return 1
+    fi
+
+    echo "Homebrew bottles for librtmp2 $VERSION are complete."
+}
+
 check_windows() {
     local missing=0
     local arch base package
@@ -115,6 +125,7 @@ case "${1:-}" in
     rpm) check_rpm ;;
     arch) check_arch ;;
     homebrew) check_homebrew ;;
+    homebrew_bottle) check_homebrew_bottle ;;
     windows) check_windows ;;
     *) usage ;;
 esac

@@ -166,6 +166,9 @@ formula automatically. To trust the whole tap up front instead, run
 `brew trust openrtmp/packages`.
 
 The formula is updated automatically when a new librtmp2 release is published.
+On macOS Sequoia and Tahoe (arm64), `brew install` fetches a precompiled
+bottle instead of building from source; other platforms build librtmp2
+locally.
 
 ## Windows
 
