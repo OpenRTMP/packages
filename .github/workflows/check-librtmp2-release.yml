@@ -192,7 +192,9 @@ jobs:
   dispatch-homebrew-bottle:
     name: Start Homebrew bottle workflow
     needs: check
-    if: needs.check.outputs.homebrew_bottle_needed == 'true'
+    if: >-
+      needs.check.outputs.homebrew_bottle_needed == 'true' &&
+      needs.check.outputs.homebrew_needed == 'false'
     runs-on: ubuntu-latest
     permissions:
       actions: write

@@ -89,7 +89,8 @@ jobs:
             cbindgen --lang c --cpp-compat --crate librtmp2 --output "include\librtmp2\librtmp2.h"
           }
 
-          cargo build --release --locked --target $env:RUST_TARGET
+          # librtmp2 library releases intentionally do not ship Cargo.lock.
+          cargo build --release --target $env:RUST_TARGET
 
           $targetDir = Join-Path $source "target\$env:RUST_TARGET\release"
           if (-not (Test-Path (Join-Path $targetDir "librtmp2.dll"))) {
