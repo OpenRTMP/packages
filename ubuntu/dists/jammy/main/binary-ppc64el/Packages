@@ -32,6 +32,23 @@ Description: RTMP and RTMPS protocol library
  librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
  shared library and stable C-compatible FFI.
 
+Package: librtmp2
+Version: 0.8.1-1+jammy1
+Architecture: ppc64el
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: libc6, libssl3
+Filename: pool/main/l/librtmp2/librtmp2_0.8.1-1+jammy1_ppc64el.deb
+Size: 466346
+MD5sum: eb1ce652a1b237c65ce87b9170476e6f
+SHA1: 5d1639b65b3195bddac59601277bca1d901831d3
+SHA256: 02976e29bad8033e3571173d25cd2c1b374645d4a8201ade61d6fa10afc9d51b
+Section: libs
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: RTMP and RTMPS protocol library
+ librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
+ shared library and stable C-compatible FFI.
+
 Package: librtmp2-dev
 Version: 0.7.0-1+jammy1
 Architecture: ppc64el
@@ -59,6 +76,23 @@ Size: 4603554
 MD5sum: f96da5529fb3fb293326de5106fcdcbf
 SHA1: 1494f41884499dfb461ac05ed5af0ab729e6fd04
 SHA256: ef32df435a3acb4e69a27a287c1aaa485bf0896e9b3fe3f3e3f50d5a64717467
+Section: libdevel
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: Development files for librtmp2
+ This package contains the C header, static library, and pkg-config metadata
+ required to build software against librtmp2.
+
+Package: librtmp2-dev
+Version: 0.8.1-1+jammy1
+Architecture: ppc64el
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: librtmp2 (= 0.8.1-1+jammy1)
+Filename: pool/main/l/librtmp2/librtmp2-dev_0.8.1-1+jammy1_ppc64el.deb
+Size: 4601874
+MD5sum: e39b689f9068ffb9697f2b6a9a363877
+SHA1: 6c35d16fffc3b804c65659e989897b56bb63f385
+SHA256: 69f5b611c617dd2bb416e733e2920522a215ac43457573922ebea0389e944410
 Section: libdevel
 Priority: optional
 Homepage: https://github.com/OpenRTMP/librtmp2
