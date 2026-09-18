@@ -26,6 +26,7 @@ Supported releases:
 - Ubuntu 22.04 LTS (`jammy`)
 - Ubuntu 24.04 LTS (`noble`)
 - Ubuntu 26.04 LTS (`resolute`)
+- Ubuntu 26.10 (`stonking`)
 
 Supported architectures are `amd64`, `arm64`, `armhf`, `ppc64el`, `riscv64`,
 and `s390x`.
@@ -53,6 +54,7 @@ Supported branches:
 - Alpine 3.22 (`v3.22`)
 - Alpine 3.23 (`v3.23`)
 - Alpine 3.24 (`v3.24`)
+- Alpine Edge (`edge`)
 
 Supported architectures are `x86_64`, `x86`, `aarch64`, `armv7`, `ppc64le`,
 `riscv64`, and `s390x`.

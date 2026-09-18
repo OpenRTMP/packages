@@ -60,6 +60,12 @@ jobs:
           - { codename: resolute, image: "ubuntu:26.04", architecture: ppc64el, platform: "linux/ppc64le" }
           - { codename: resolute, image: "ubuntu:26.04", architecture: riscv64, platform: "linux/riscv64" }
           - { codename: resolute, image: "ubuntu:26.04", architecture: s390x, platform: "linux/s390x" }
+          - { codename: stonking, image: "ubuntu:26.10", architecture: amd64, platform: "linux/amd64" }
+          - { codename: stonking, image: "ubuntu:26.10", architecture: arm64, platform: "linux/arm64" }
+          - { codename: stonking, image: "ubuntu:26.10", architecture: armhf, platform: "linux/arm/v7" }
+          - { codename: stonking, image: "ubuntu:26.10", architecture: ppc64el, platform: "linux/ppc64le" }
+          - { codename: stonking, image: "ubuntu:26.10", architecture: riscv64, platform: "linux/riscv64" }
+          - { codename: stonking, image: "ubuntu:26.10", architecture: s390x, platform: "linux/s390x" }
 
     steps:
       - uses: actions/checkout@v7
@@ -168,7 +174,7 @@ jobs:
             filename="$(basename "$package")"
             case "$filename" in
               *+bookworm1_*|*+trixie1_*) destination=debian ;;
-              *+jammy1_*|*+noble1_*|*+resolute1_*) destination=ubuntu ;;
+              *+jammy1_*|*+noble1_*|*+resolute1_*|*+stonking1_*) destination=ubuntu ;;
               *) echo "Unknown package distribution: $filename" >&2; exit 1 ;;
             esac
             cp "$package" "$destination/pool/main/l/librtmp2/"
@@ -179,7 +185,7 @@ jobs:
         run: |
           chmod +x scripts/generate-apt-repository.sh
           scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/debian" bookworm trixie
-          scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/ubuntu" jammy noble resolute
+          scripts/generate-apt-repository.sh "$GITHUB_WORKSPACE/ubuntu" jammy noble resolute stonking
 
       - name: Import signing key
         if: steps.packages.outputs.available == 'true'
@@ -201,7 +207,7 @@ jobs:
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
         shell: bash
         run: |
-          for release in debian/dists/{bookworm,trixie}/Release ubuntu/dists/{jammy,noble,resolute}/Release; do
+          for release in debian/dists/{bookworm,trixie}/Release ubuntu/dists/{jammy,noble,resolute,stonking}/Release; do
             [[ -f "$release" ]] || continue
             directory="$(dirname "$release")"
             gpg --batch --yes --pinentry-mode loopback \

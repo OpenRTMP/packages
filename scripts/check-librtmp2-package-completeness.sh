@@ -62,6 +62,12 @@ check_apt() {
         "ubuntu:resolute:ppc64el"
         "ubuntu:resolute:riscv64"
         "ubuntu:resolute:s390x"
+        "ubuntu:stonking:amd64"
+        "ubuntu:stonking:arm64"
+        "ubuntu:stonking:armhf"
+        "ubuntu:stonking:ppc64el"
+        "ubuntu:stonking:riscv64"
+        "ubuntu:stonking:s390x"
     )
 
     for target in "${targets[@]}"; do
@@ -74,7 +80,7 @@ check_apt() {
         check_file "$root/dists/$codename/main/binary-$arch/Packages.gz" || missing=1
     done
 
-    for target in "debian:bookworm" "debian:trixie" "ubuntu:jammy" "ubuntu:noble" "ubuntu:resolute"; do
+    for target in "debian:bookworm" "debian:trixie" "ubuntu:jammy" "ubuntu:noble" "ubuntu:resolute" "ubuntu:stonking"; do
         IFS=: read -r root codename <<< "$target"
         check_file "$root/dists/$codename/Release" || missing=1
         check_file "$root/dists/$codename/InRelease" || missing=1
@@ -92,7 +98,7 @@ check_apt() {
 check_alpine() {
     local missing=0
     local branch arch base
-    local -a branches=(v3.21 v3.22 v3.23 v3.24)
+    local -a branches=(v3.21 v3.22 v3.23 v3.24 edge)
     local -a arches=(x86_64 x86 aarch64 armv7 ppc64le riscv64 s390x)
 
     for branch in "${branches[@]}"; do

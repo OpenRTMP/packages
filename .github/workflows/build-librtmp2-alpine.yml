@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        branch: ["v3.21", "v3.22", "v3.23", "v3.24"]
+        branch: ["v3.21", "v3.22", "v3.23", "v3.24", "edge"]
         arch: [x86_64, x86, aarch64, armv7, ppc64le, riscv64, s390x]
 
     steps:
@@ -174,8 +174,9 @@ jobs:
           while IFS= read -r package; do
             relative="${package#downloaded-alpine/}"
             artifact="${relative%%/*}"
-            branch="$(printf '%s' "$artifact" | sed -E 's/^librtmp2-alpine-(v3\.[0-9]+)-.*/\1/')"
             arch="${artifact##*-}"
+            branch="${artifact#librtmp2-alpine-}"
+            branch="${branch%-$arch}"
             destination="alpine/$branch/main/$arch"
             mkdir -p "$destination"
             cp "$package" "$destination/"
