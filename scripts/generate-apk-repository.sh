@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="${1:-$PWD}"
 PRIVATE_KEY="${ALPINE_PRIVATE_KEY_PATH:?ALPINE_PRIVATE_KEY_PATH is required}"
 PUBLIC_KEY="${ALPINE_PUBLIC_KEY_PATH:-$ROOT_DIR/openrtmp-alpine.rsa.pub}"
-BRANCHES=(v3.21 v3.22 v3.23 v3.24)
+BRANCHES=(v3.21 v3.22 v3.23 v3.24 edge)
 ARCHITECTURES=(x86_64 x86 aarch64 armv7 ppc64le riscv64 s390x)
 
 if [[ ! -f "$PUBLIC_KEY" ]]; then
