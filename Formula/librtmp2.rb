@@ -1,18 +1,9 @@
 class Librtmp2 < Formula
   desc "Modern RTMP and RTMPS protocol library"
   homepage "https://github.com/OpenRTMP/librtmp2"
-  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.8.0/librtmp2-0.8.0-src.tar.gz"
-  sha256 "8e1be00972fa6f8c8b5452ed64189c7335ff5ce88f3779cdbb7d518b7af33a7b"
+  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.8.1/librtmp2-0.8.1-src.tar.gz"
+  sha256 "6f88dfee9c7f833ba6e4070e3cb26e9dd44978837b5812e21bccf4ac9eba38dd"
   license "MIT"
-
-  bottle do
-    root_url "https://packages.openrtmp.org/homebrew/librtmp2/0.8.0"
-    sha256 cellar: :any, arm64_golden_gate: "2f69b98a1b753f17b00b636f932df4fc98c7cc50324267d86bf50deedfef1c5c"
-    sha256 cellar: :any, arm64_tahoe:       "975c9366f2f503f0e30aea0c4f176361a345aa3018df986bbb051c1e47afa8e2"
-    sha256 cellar: :any, arm64_sequoia:     "08b3f0fa7e895cfbcdfb239af1720e1f22b5cae6b85c5adb8c7bce4f659f644b"
-    sha256 cellar: :any, tahoe:             "a4ae292ba79d7941e10b442de6cf4c3025597d802e946f9280f95e8675ddc0ba"
-    sha256 cellar: :any, sequoia:           "e0a36fc952e5506eeca01865079a43240422d63935b0aabeaf43023289a552bd"
-  end
 
   depends_on "cbindgen" => :build
   depends_on "pkgconf" => :build
