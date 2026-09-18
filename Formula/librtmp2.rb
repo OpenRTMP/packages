@@ -1,8 +1,8 @@
 class Librtmp2 < Formula
   desc "Modern RTMP and RTMPS protocol library"
   homepage "https://github.com/OpenRTMP/librtmp2"
-  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.8.0/librtmp2-0.8.0-src.tar.gz"
-  sha256 "8e1be00972fa6f8c8b5452ed64189c7335ff5ce88f3779cdbb7d518b7af33a7b"
+  url "https://github.com/OpenRTMP/librtmp2/archive/refs/tags/v0.8.1.tar.gz"
+  sha256 "abefed298df56b6f708805ed20f9afe9ea3546ebf937c5daa9b0579dabb52c33"
   license "MIT"
 
   bottle do
