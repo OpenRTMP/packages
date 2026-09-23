@@ -1,8 +1,8 @@
 class Librtmp2 < Formula
   desc "Modern RTMP and RTMPS protocol library"
   homepage "https://github.com/OpenRTMP/librtmp2"
-  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.9.1/librtmp2-0.9.1-src.tar.gz"
-  sha256 "f807fa0d4d98a3ba065064204b0b1e346159f85efa0de7cc0514005353e752f4"
+  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.9.2/librtmp2-0.9.2-src.tar.gz"
+  sha256 "a377ea8d5d9600fa96cc1c9a5af99582af2c9e9f544c10717d5fe080ab2e37cc"
   license "MIT"
 
   depends_on "cbindgen" => :build
