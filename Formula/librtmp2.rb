@@ -1,18 +1,9 @@
 class Librtmp2 < Formula
   desc "Modern RTMP and RTMPS protocol library"
   homepage "https://github.com/OpenRTMP/librtmp2"
-  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.9.2/librtmp2-0.9.2-src.tar.gz"
-  sha256 "a377ea8d5d9600fa96cc1c9a5af99582af2c9e9f544c10717d5fe080ab2e37cc"
+  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.9.3/librtmp2-0.9.3-src.tar.gz"
+  sha256 "c02e443d8924ce58871eb9871b9e0f84754f608236a363a97db87273593da493"
   license "MIT"
-
-  bottle do
-    root_url "https://packages.openrtmp.org/homebrew/librtmp2/0.9.2"
-    sha256 cellar: :any, arm64_golden_gate: "13f9f554fb4d98f85cb8ed85cd1bab66bc3fb33517bcf49e7a098f44c3ddc593"
-    sha256 cellar: :any, arm64_tahoe:       "8178321481e580de7ab44476b498a47fb95546065f2d45a458c6552b49861f22"
-    sha256 cellar: :any, arm64_sequoia:     "8011c79c74a819a75e75ad65f20ee796ba809a79553c9189466dbbb737134303"
-    sha256 cellar: :any, tahoe:             "9ad3f6ff91ba982311533b14f248b0da55978d56c51a9becced5e6340d5c605f"
-    sha256 cellar: :any, sequoia:           "8251f45713132d28f9864637cc1c780252d616461df5bbfa35e7f37985e233ae"
-  end
 
   depends_on "cbindgen" => :build
   depends_on "pkgconf" => :build
