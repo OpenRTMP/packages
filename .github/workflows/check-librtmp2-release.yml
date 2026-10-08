@@ -117,7 +117,12 @@ jobs:
           target_status arch build-librtmp2-arch.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Arch"
           target_status homebrew update-librtmp2-homebrew.yml scripts/check-librtmp2-additional-package-completeness.sh "Update librtmp2 Homebrew"
           target_status homebrew_bottle build-librtmp2-homebrew-bottle.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Homebrew Bottle"
-          target_status windows build-librtmp2-windows.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Windows"
+          # Upstream librtmp2 v0.11.0 uses Unix-only raw FDs and libc::poll.
+          # Windows packaging cannot succeed until native Windows socket support
+          # is implemented in librtmp2. Do not repeatedly dispatch broken builds.
+          # Re-enable this target when the upstream Windows port is available.
+          echo "windows_needed=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::Windows packaging is paused: upstream librtmp2 is not yet Windows-compatible."
 
   dispatch-apt:
     name: Start APT package workflow
