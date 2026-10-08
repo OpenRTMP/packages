@@ -89,6 +89,11 @@ static() {
 }
 EOF
 
+# Use a stable package destination across Alpine releases. Alpine edge now
+# defaults to the XDG data directory instead of $HOME/packages.
+export REPODEST="$HOME/packages"
+mkdir -p "$REPODEST"
+
 abuild checksum
 
 # Build the APKs explicitly instead of using abuild's default `all` action.
