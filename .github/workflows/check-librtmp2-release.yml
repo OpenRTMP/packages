@@ -253,7 +253,7 @@ jobs:
             echo "- Arch Linux build required: \`${{ needs.check.outputs.arch_needed }}\`"
             echo "- Homebrew update required: \`${{ needs.check.outputs.homebrew_needed }}\`"
             echo "- Homebrew bottle build required: \`${{ needs.check.outputs.homebrew_bottle_needed }}\`"
-            echo "- Windows build required: \`${{ needs.check.outputs.windows_needed }}\`"
+            echo "- Windows packages: **paused** (upstream Unix-only socket implementation; no Windows binaries are produced)"
             echo
             echo "A target is considered published only when its configured package artifacts and repository metadata are present."
           } >> "$GITHUB_STEP_SUMMARY"
