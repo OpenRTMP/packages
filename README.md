@@ -1,7 +1,7 @@
 # OpenRTMP packages
 
 This repository publishes native packages for Debian, Ubuntu, Alpine, Fedora,
-Enterprise Linux, openSUSE, Arch Linux, and Homebrew. Windows support is planned.
+Enterprise Linux, openSUSE, Arch Linux, Homebrew, and Windows.
 
 ## Debian repository
 
@@ -176,21 +176,25 @@ deprecated), build librtmp2 locally.
 
 ## Windows
 
-**Windows packages are currently unavailable for librtmp2 v0.11.0.** The
-upstream Rust library uses Unix-specific socket/file-descriptor APIs and does
-not compile for Windows yet. Automatic Windows builds are paused until the
-library gains native Windows support.
+Signed Windows ZIPs are built for both `x86_64` and `arm64` for every
+librtmp2 release with native Windows support (releases up to v0.11.0 do not
+build on Windows and have no Windows packages). Each architecture is built,
+tested (including RTMP and RTMPS loopback tests) and checked on a native
+runner of that architecture before it is published.
 
-Once supported, signed Windows ZIPs are intended for both `x86_64` and `arm64`.
-Each ZIP will contain the native DLL, import/static libraries, C header,
-README, librtmp2 license, and the OpenSSL license notice. OpenSSL will be
-linked statically, with SHA-256 and OpenPGP signatures for each archive.
+Each ZIP contains `bin\librtmp2.dll`, the import library
+`lib\librtmp2.dll.lib`, the static library `lib\librtmp2.lib`, the C header
+`include\librtmp2\librtmp2.h`, README, the librtmp2 license, and the OpenSSL
+license notice. OpenSSL is linked statically, so the DLL needs only Windows
+system DLLs plus the Microsoft Visual C++ Redistributable (2015-2022) that
+every Rust/MSVC DLL uses. Each archive has a SHA-256 checksum and an OpenPGP
+signature.
 
 The verification example below requires GnuPG (`gpg`) to be installed. The
 trusted OpenRTMP package-signing key fingerprint is
 `615A20712AA690E917D6DCEF75E87340DA09771D`.
 
-PowerShell example for a release **after Windows packaging is available**:
+PowerShell example:
 
 ```powershell
 $version = (Invoke-RestMethod https://api.github.com/repos/OpenRTMP/librtmp2/releases/latest).tag_name.TrimStart('v')
@@ -233,4 +237,4 @@ Expand-Archive $file -DestinationPath .
 - RPM/DNF/Zypper: `librtmp2`, `librtmp2-devel`
 - Arch Linux: `librtmp2`
 - Homebrew: `librtmp2`
-- Windows: `x86_64` and `arm64` ZIPs (planned; currently blocked by upstream Windows support)
+- Windows: `x86_64` and `arm64` ZIPs (librtmp2 releases with native Windows support)
