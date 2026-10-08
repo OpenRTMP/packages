@@ -100,8 +100,13 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:LIBRTMP2_REF)) {
             git clone --depth 1 --branch "v$env:VERSION" https://github.com/OpenRTMP/librtmp2.git $source
           } else {
-            git clone https://github.com/OpenRTMP/librtmp2.git $source
-            git -C $source checkout --detach $env:LIBRTMP2_REF
+            # Fetch the branch or commit explicitly: a bare `checkout` of a
+            # remote-only branch name would try to create a local branch.
+            git init --quiet $source
+            if ($LASTEXITCODE -ne 0) { throw "Could not fetch the librtmp2 source." }
+            git -C $source fetch --quiet https://github.com/OpenRTMP/librtmp2.git $env:LIBRTMP2_REF
+            if ($LASTEXITCODE -ne 0) { throw "Could not fetch librtmp2 ref $env:LIBRTMP2_REF." }
+            git -C $source checkout --quiet --detach FETCH_HEAD
           }
           if ($LASTEXITCODE -ne 0) { throw "Could not fetch the librtmp2 source." }
           Set-Location $source
