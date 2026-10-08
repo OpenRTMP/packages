@@ -1,7 +1,7 @@
 # OpenRTMP packages
 
 This repository publishes native packages for Debian, Ubuntu, Alpine, Fedora,
-Enterprise Linux, openSUSE, Arch Linux, Homebrew, and Windows.
+Enterprise Linux, openSUSE, Arch Linux, and Homebrew. Windows support is planned.
 
 ## Debian repository
 
@@ -176,16 +176,21 @@ deprecated), build librtmp2 locally.
 
 ## Windows
 
-Signed Windows packages are built for both `x86_64` and `arm64`. Each ZIP
-contains the native DLL, import/static libraries, C header, README, librtmp2
-license, and the OpenSSL license notice. OpenSSL is linked statically into both
-builds. Each ZIP is accompanied by SHA-256 and OpenPGP signature files.
+**Windows packages are currently unavailable for librtmp2 v0.11.0.** The
+upstream Rust library uses Unix-specific socket/file-descriptor APIs and does
+not compile for Windows yet. Automatic Windows builds are paused until the
+library gains native Windows support.
+
+Once supported, signed Windows ZIPs are intended for both `x86_64` and `arm64`.
+Each ZIP will contain the native DLL, import/static libraries, C header,
+README, librtmp2 license, and the OpenSSL license notice. OpenSSL will be
+linked statically, with SHA-256 and OpenPGP signatures for each archive.
 
 The verification example below requires GnuPG (`gpg`) to be installed. The
 trusted OpenRTMP package-signing key fingerprint is
 `615A20712AA690E917D6DCEF75E87340DA09771D`.
 
-PowerShell example for the latest release:
+PowerShell example for a release **after Windows packaging is available**:
 
 ```powershell
 $version = (Invoke-RestMethod https://api.github.com/repos/OpenRTMP/librtmp2/releases/latest).tag_name.TrimStart('v')
@@ -228,4 +233,4 @@ Expand-Archive $file -DestinationPath .
 - RPM/DNF/Zypper: `librtmp2`, `librtmp2-devel`
 - Arch Linux: `librtmp2`
 - Homebrew: `librtmp2`
-- Windows: signed `x86_64` and `arm64` binary ZIPs
+- Windows: `x86_64` and `arm64` ZIPs (planned; currently blocked by upstream Windows support)
