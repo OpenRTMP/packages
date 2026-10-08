@@ -146,13 +146,27 @@ jobs:
           mkdir -p arch
           cp -a downloaded-arch/arch/. arch/
 
+          # Only add the newly built version. With -R, repo-add removes the old
+          # package file while updating the database; passing old files too
+          # would make repo-add try to read a file it just deleted.
           docker run --rm \
+            -e VERSION="${RAW_VERSION#v}" \
             -v "$GITHUB_WORKSPACE:/repo" \
             archlinux:base-devel \
             bash -euxo pipefail -c '
-              repo-add -R /repo/arch/x86_64/openrtmp.db.tar.gz \
-                /repo/arch/x86_64/*.pkg.tar.zst
+              shopt -s nullglob
+              packages=(/repo/arch/x86_64/librtmp2-"$VERSION"-*.pkg.tar.zst)
+              [[ "${#packages[@]}" -eq 1 ]] || {
+                echo "Expected exactly one Arch package for $VERSION, found ${#packages[@]}." >&2
+                exit 1
+              }
+              repo-add -R /repo/arch/x86_64/openrtmp.db.tar.gz "${packages[@]}"
             '
+
+          # Remove signatures for package files pruned by repo-add -R.
+          for signature in arch/x86_64/librtmp2-*.pkg.tar.zst.sig; do
+            [[ -f "${signature%.sig}" ]] || rm -f "$signature"
+          done
 
           rm -f arch/x86_64/openrtmp.db arch/x86_64/openrtmp.files
           cp arch/x86_64/openrtmp.db.tar.gz arch/x86_64/openrtmp.db
