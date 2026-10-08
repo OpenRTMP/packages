@@ -98,8 +98,21 @@ jobs:
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
             bash -euxo pipefail -c '
               apt-get update
-              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-                build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config
+              # Ubuntu 26.10 armhf under QEMU can intermittently fail while
+              # cleaning /var/lib/dpkg/tmp.ci during a dpkg/perl-base upgrade.
+              # Retry only that combination; other distributions must fail fast.
+              for attempt in 1 2 3; do
+                if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                  build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config; then
+                  break
+                fi
+                if [[ "$CODENAME" != stonking || "$EXPECTED_ARCHITECTURE" != armhf || "$attempt" -eq 3 ]]; then
+                  exit 1
+                fi
+                echo "Retrying Ubuntu 26.10 armhf package setup (attempt $((attempt + 1))/3)." >&2
+                rm -rf /var/lib/dpkg/tmp.ci
+                DEBIAN_FRONTEND=noninteractive dpkg --configure -a
+              done
               rustup_args=(-y --profile minimal --default-toolchain 1.93.0)
               if [[ "$EXPECTED_ARCHITECTURE" == "i386" ]]; then
                 rustup_args+=(--default-host i686-unknown-linux-gnu)
