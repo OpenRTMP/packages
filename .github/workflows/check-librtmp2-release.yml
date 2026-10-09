@@ -26,6 +26,7 @@ jobs:
       homebrew_needed: ${{ steps.status.outputs.homebrew_needed }}
       homebrew_bottle_needed: ${{ steps.status.outputs.homebrew_bottle_needed }}
       windows_needed: ${{ steps.status.outputs.windows_needed }}
+      windows_supported: ${{ steps.status.outputs.windows_supported }}
 
     steps:
       - name: Checkout package repository
@@ -117,12 +118,22 @@ jobs:
           target_status arch build-librtmp2-arch.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Arch"
           target_status homebrew update-librtmp2-homebrew.yml scripts/check-librtmp2-additional-package-completeness.sh "Update librtmp2 Homebrew"
           target_status homebrew_bottle build-librtmp2-homebrew-bottle.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Homebrew Bottle"
-          # Upstream librtmp2 v0.11.0 uses Unix-only raw FDs and libc::poll.
-          # Windows packaging cannot succeed until native Windows socket support
-          # is implemented in librtmp2. Do not repeatedly dispatch broken builds.
-          # Re-enable this target when the upstream Windows port is available.
-          echo "windows_needed=false" >> "$GITHUB_OUTPUT"
-          echo "::warning::Windows packaging is paused: upstream librtmp2 is not yet Windows-compatible."
+          # Releases up to v0.11.0 have no Windows socket backend and cannot
+          # build on Windows. Dispatch Windows packaging only for a release
+          # whose source contains it, so broken builds are never retried.
+          # Only a 404 means "not supported"; any other API failure fails the
+          # check so a later run retries instead of silently skipping Windows.
+          if windows_probe="$(gh api "repos/OpenRTMP/librtmp2/contents/src/net/windows.rs?ref=v${VERSION}" --silent 2>&1)"; then
+            echo "windows_supported=true" >> "$GITHUB_OUTPUT"
+            target_status windows build-librtmp2-windows.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Windows"
+          elif grep -q "HTTP 404" <<<"$windows_probe"; then
+            echo "windows_supported=false" >> "$GITHUB_OUTPUT"
+            echo "windows_needed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::librtmp2 v${VERSION} has no native Windows support; no Windows packages are built for it."
+          else
+            echo "::error::Could not check librtmp2 v${VERSION} for Windows support: ${windows_probe}"
+            exit 1
+          fi
 
   dispatch-apt:
     name: Start APT package workflow
@@ -253,7 +264,11 @@ jobs:
             echo "- Arch Linux build required: \`${{ needs.check.outputs.arch_needed }}\`"
             echo "- Homebrew update required: \`${{ needs.check.outputs.homebrew_needed }}\`"
             echo "- Homebrew bottle build required: \`${{ needs.check.outputs.homebrew_bottle_needed }}\`"
-            echo "- Windows packages: **paused** (upstream Unix-only socket implementation; no Windows binaries are produced)"
+            if [[ "${{ needs.check.outputs.windows_supported }}" == "true" ]]; then
+              echo "- Windows build required: \`${{ needs.check.outputs.windows_needed }}\`"
+            else
+              echo "- Windows packages: not built (this release has no native Windows support)"
+            fi
             echo
             echo "A target is considered published only when its configured package artifacts and repository metadata are present."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -9,16 +9,27 @@ on:
         description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
         required: true
         type: string
+      librtmp2_ref:
+        description: >-
+          Optional librtmp2 branch or commit to build instead of the v<version>
+          tag. Validation only: such builds are tested and packaged but never
+          published.
+        required: false
+        type: string
+        default: ""
   repository_dispatch:
     types: [librtmp2-release]
 
 env:
   RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+  LIBRTMP2_REF: ${{ github.event.inputs.librtmp2_ref || '' }}
 
 jobs:
   build:
     name: Windows / ${{ matrix.arch }}
-    runs-on: windows-latest
+    # Each architecture builds on a native runner so its tests and the DLL
+    # load check run on the same CPU architecture the package targets.
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     strategy:
@@ -26,9 +37,11 @@ jobs:
       matrix:
         include:
           - arch: x86_64
+            runner: windows-latest
             rust_target: x86_64-pc-windows-msvc
             vcpkg_triplet: x64-windows-static-md
           - arch: arm64
+            runner: windows-11-arm
             rust_target: aarch64-pc-windows-msvc
             vcpkg_triplet: arm64-windows-static-md
 
@@ -64,10 +77,17 @@ jobs:
         env:
           VCPKG_TRIPLET: ${{ matrix.vcpkg_triplet }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:VCPKG_INSTALLATION_ROOT)) {
-            throw "VCPKG_INSTALLATION_ROOT is not available on this runner."
+          $root = $env:VCPKG_INSTALLATION_ROOT
+          if ([string]::IsNullOrWhiteSpace($root) -or -not (Test-Path "$root\vcpkg.exe")) {
+            # Not every runner image ships vcpkg (e.g. Windows ARM64).
+            $root = Join-Path $env:RUNNER_TEMP "vcpkg"
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git $root
+            & "$root\bootstrap-vcpkg.bat" -disableMetrics
+            if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed." }
           }
-          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install "openssl:$env:VCPKG_TRIPLET"
+          & "$root\vcpkg.exe" install "openssl:$env:VCPKG_TRIPLET"
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg could not install OpenSSL." }
+          "VCPKG_ROOT_DIR=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build librtmp2
         shell: pwsh
@@ -77,10 +97,27 @@ jobs:
           VCPKG_TRIPLET: ${{ matrix.vcpkg_triplet }}
         run: |
           $source = Join-Path $env:GITHUB_WORKSPACE "librtmp2"
-          git clone --depth 1 --branch "v$env:VERSION" https://github.com/OpenRTMP/librtmp2.git $source
+          if ([string]::IsNullOrWhiteSpace($env:LIBRTMP2_REF)) {
+            git clone --depth 1 --branch "v$env:VERSION" https://github.com/OpenRTMP/librtmp2.git $source
+          } else {
+            # Fetch the branch or commit explicitly: a bare `checkout` of a
+            # remote-only branch name would try to create a local branch.
+            git init --quiet $source
+            if ($LASTEXITCODE -ne 0) { throw "Could not fetch the librtmp2 source." }
+            git -C $source fetch --quiet https://github.com/OpenRTMP/librtmp2.git $env:LIBRTMP2_REF
+            if ($LASTEXITCODE -ne 0) { throw "Could not fetch librtmp2 ref $env:LIBRTMP2_REF." }
+            git -C $source checkout --quiet --detach FETCH_HEAD
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Could not fetch the librtmp2 source." }
           Set-Location $source
 
-          $env:OPENSSL_DIR = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\$env:VCPKG_TRIPLET"
+          # Releases before native Windows support cannot build here; fail
+          # with a clear message instead of a page of compiler errors.
+          if (-not (Test-Path "src\net\windows.rs")) {
+            throw "This librtmp2 source has no Windows socket backend (src/net/windows.rs); Windows packages need a release with native Windows support."
+          }
+
+          $env:OPENSSL_DIR = Join-Path $env:VCPKG_ROOT_DIR "installed\$env:VCPKG_TRIPLET"
           $env:OPENSSL_STATIC = "1"
 
           cargo install --locked cbindgen
@@ -99,6 +136,21 @@ jobs:
           if (-not (Get-ChildItem $targetDir -Filter "librtmp2*.lib" -ErrorAction SilentlyContinue)) {
             throw "No librtmp2 import/static library was produced in $targetDir."
           }
+
+      - name: Test librtmp2 on this architecture
+        shell: pwsh
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
+          VCPKG_TRIPLET: ${{ matrix.vcpkg_triplet }}
+        run: |
+          # The release build's own unit and loopback integration tests,
+          # including RTMP and RTMPS publish/play, on the package's CPU
+          # architecture. A failure here stops the package from being made.
+          Set-Location (Join-Path $env:GITHUB_WORKSPACE "librtmp2")
+          $env:OPENSSL_DIR = Join-Path $env:VCPKG_ROOT_DIR "installed\$env:VCPKG_TRIPLET"
+          $env:OPENSSL_STATIC = "1"
+          cargo test --release --all-features --target $env:RUST_TARGET -- --test-threads=1
+          if ($LASTEXITCODE -ne 0) { throw "librtmp2 tests failed." }
 
       - name: Create Windows package
         shell: pwsh
@@ -128,7 +180,7 @@ jobs:
           Copy-Item (Join-Path $source "README.md") $stage
           Copy-Item (Join-Path $source "LICENSE") $stage
 
-          $opensslLicense = Join-Path $env:VCPKG_INSTALLATION_ROOT "installed\$env:VCPKG_TRIPLET\share\openssl\copyright"
+          $opensslLicense = Join-Path $env:VCPKG_ROOT_DIR "installed\$env:VCPKG_TRIPLET\share\openssl\copyright"
           if (-not (Test-Path $opensslLicense)) {
             throw "OpenSSL license notice was not found at $opensslLicense."
           }
@@ -140,6 +192,41 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
           "$hash  $stageName.zip" | Set-Content -Encoding ascii "$archive.sha256"
 
+      - name: Validate Windows package
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          # Check the archive exactly as users get it: checksum, layout, and
+          # the extracted DLL's architecture, dependencies and C ABI.
+          $stageName = "librtmp2-$env:VERSION-windows-$env:ARCH"
+          $archive = Join-Path $env:GITHUB_WORKSPACE "artifact\windows\$env:ARCH\$env:VERSION\$stageName.zip"
+          $expected = ((Get-Content "$archive.sha256" -Raw).Trim() -split '\s+')[0]
+          $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "SHA-256 file does not match the archive." }
+
+          $extract = Join-Path $env:RUNNER_TEMP "validate-$env:ARCH"
+          Expand-Archive $archive -DestinationPath $extract -Force
+          $root = Join-Path $extract $stageName
+          $required = @(
+            "bin\librtmp2.dll",
+            "lib\librtmp2.dll.lib",
+            "lib\librtmp2.lib",
+            "include\librtmp2\librtmp2.h",
+            "README.md",
+            "LICENSE",
+            "OPENSSL-LICENSE.txt"
+          )
+          foreach ($file in $required) {
+            if (-not (Test-Path (Join-Path $root $file))) { throw "Package is missing $file." }
+          }
+          Get-ChildItem -Recurse $root | Select-Object FullName, Length | Format-Table -AutoSize
+
+          $smoke = Join-Path $env:GITHUB_WORKSPACE "librtmp2\scripts\windows-dll-smoke.ps1"
+          if (-not (Test-Path $smoke)) { throw "librtmp2 source has no scripts/windows-dll-smoke.ps1." }
+          & $smoke -Dll (Join-Path $root "bin\librtmp2.dll") -Arch $env:ARCH
+
       - name: Upload Windows package
         uses: actions/upload-artifact@v7
         with:
@@ -150,7 +237,8 @@ jobs:
   publish:
     name: Update Windows packages
     needs: build
-    if: needs.build.result == 'success'
+    # Builds of an explicit librtmp2_ref are validation runs: never publish.
+    if: needs.build.result == 'success' && (github.event.inputs.librtmp2_ref || '') == ''
     runs-on: ubuntu-latest
     permissions:
       actions: write
