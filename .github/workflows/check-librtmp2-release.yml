@@ -121,13 +121,18 @@ jobs:
           # Releases up to v0.11.0 have no Windows socket backend and cannot
           # build on Windows. Dispatch Windows packaging only for a release
           # whose source contains it, so broken builds are never retried.
-          if gh api "repos/OpenRTMP/librtmp2/contents/src/net/windows.rs?ref=v${VERSION}" --silent 2>/dev/null; then
+          # Only a 404 means "not supported"; any other API failure fails the
+          # check so a later run retries instead of silently skipping Windows.
+          if windows_probe="$(gh api "repos/OpenRTMP/librtmp2/contents/src/net/windows.rs?ref=v${VERSION}" --silent 2>&1)"; then
             echo "windows_supported=true" >> "$GITHUB_OUTPUT"
             target_status windows build-librtmp2-windows.yml scripts/check-librtmp2-additional-package-completeness.sh "Build librtmp2 Windows"
-          else
+          elif grep -q "HTTP 404" <<<"$windows_probe"; then
             echo "windows_supported=false" >> "$GITHUB_OUTPUT"
             echo "windows_needed=false" >> "$GITHUB_OUTPUT"
             echo "::notice::librtmp2 v${VERSION} has no native Windows support; no Windows packages are built for it."
+          else
+            echo "::error::Could not check librtmp2 v${VERSION} for Windows support: ${windows_probe}"
+            exit 1
           fi
 
   dispatch-apt:
