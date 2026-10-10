@@ -19,14 +19,38 @@ if [[ ! -f include/librtmp2/librtmp2.h ]]; then
         --output include/librtmp2/librtmp2.h
 fi
 
-cargo build --release
+# Releases that ship a Cargo.lock are built with exactly those dependency
+# versions; older tags without one still resolve them at build time.
+if [[ -f Cargo.lock ]]; then
+    cargo build --release --locked
+else
+    cargo build --release
+fi
 
 RUNTIME_ROOT="$(mktemp -d)"
 DEV_ROOT="$(mktemp -d)"
-trap 'rm -rf "$RUNTIME_ROOT" "$DEV_ROOT"' EXIT
+SHLIBS_DIR="$(mktemp -d)"
+trap 'rm -rf "$RUNTIME_ROOT" "$DEV_ROOT" "$SHLIBS_DIR"' EXIT
 
 install -Dm755 target/release/liblibrtmp2.so \
     "$RUNTIME_ROOT/usr/lib/$MULTIARCH/librtmp2.so"
+
+# Derive the runtime dependencies from the libraries the shared object
+# actually links. A hard-coded "libssl3" is not installable where OpenSSL
+# ships as libssl3t64 without a libssl3 alias (Debian 13 and Ubuntu 24.04+
+# on armhf).
+mkdir -p "$SHLIBS_DIR/debian"
+printf 'Source: librtmp2\n\nPackage: librtmp2\nArchitecture: any\n' \
+    > "$SHLIBS_DIR/debian/control"
+RUNTIME_DEPENDS="$(
+    cd "$SHLIBS_DIR"
+    dpkg-shlibdeps -O "$RUNTIME_ROOT/usr/lib/$MULTIARCH/librtmp2.so" \
+        | sed -n 's/^shlibs:Depends=//p'
+)"
+if [[ -z "$RUNTIME_DEPENDS" ]]; then
+    echo "dpkg-shlibdeps did not report any runtime dependencies." >&2
+    exit 1
+fi
 
 mkdir -p "$RUNTIME_ROOT/DEBIAN"
 cat > "$RUNTIME_ROOT/DEBIAN/control" <<EOF
@@ -36,7 +60,7 @@ Section: libs
 Priority: optional
 Architecture: $ARCH
 Maintainer: OpenRTMP <info@openrtmp.org>
-Depends: libc6, libssl3
+Depends: $RUNTIME_DEPENDS
 Homepage: https://github.com/OpenRTMP/librtmp2
 Description: RTMP and RTMPS protocol library
  librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native

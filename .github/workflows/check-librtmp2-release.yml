@@ -91,6 +91,34 @@ jobs:
                   ] | length'
           }
 
+          # Failed runs for this release on the current package-repository
+          # commit. A failure that repeats on the same commit is not
+          # transient, so dispatching it again every few minutes only burns
+          # runner time; any new commit to main (such as a fix) resets it.
+          failed_count() {
+            local workflow="$1"
+            local run_prefix="$2"
+
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "$workflow" \
+              --commit "$GITHUB_SHA" \
+              --status failure \
+              --limit 100 \
+              --json displayTitle \
+              | jq \
+                  --arg version "$VERSION" \
+                  --arg prefix "$run_prefix" \
+                  '[.[]
+                    | select(
+                        .displayTitle == ($prefix + " " + $version)
+                        or .displayTitle == ($prefix + " v" + $version)
+                      )
+                  ] | length'
+          }
+
+          max_failed_attempts=3
+
           target_status() {
             local target="$1"
             local workflow="$2"
@@ -98,6 +126,7 @@ jobs:
             local run_prefix="$4"
             local published=false
             local running
+            local failed=0
             local needed=true
 
             if "$checker" "$target"; then
@@ -106,10 +135,17 @@ jobs:
             running="$(running_count "$workflow" "$run_prefix")"
             if [[ "$published" == true || "$running" -gt 0 ]]; then
               needed=false
+            else
+              failed="$(failed_count "$workflow" "$run_prefix")"
+              if [[ "$failed" -ge "$max_failed_attempts" ]]; then
+                needed=false
+                echo "::warning::$run_prefix $VERSION failed $failed times on ${GITHUB_SHA:0:7}; not starting it again until main changes or it is started manually."
+                echo "- $run_prefix $VERSION: failed $failed times on this commit, not retried automatically" >> "$GITHUB_STEP_SUMMARY"
+              fi
             fi
 
             echo "${target}_needed=$needed" >> "$GITHUB_OUTPUT"
-            echo "$target: complete=$published running=$running needed=$needed"
+            echo "$target: complete=$published running=$running failed=$failed needed=$needed"
           }
 
           target_status apt build-librtmp2-packages.yml scripts/check-librtmp2-package-completeness.sh "Build librtmp2 APT"

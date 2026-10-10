@@ -126,8 +126,13 @@ jobs:
             cbindgen --lang c --cpp-compat --crate librtmp2 --output "include\librtmp2\librtmp2.h"
           }
 
-          # librtmp2 library releases intentionally do not ship Cargo.lock.
-          cargo build --release --target $env:RUST_TARGET
+          # Releases that ship a Cargo.lock are built with exactly those
+          # dependency versions; older tags without one still resolve them.
+          $lockedArgs = @()
+          if (Test-Path "Cargo.lock") { $lockedArgs = @("--locked") }
+          "CARGO_LOCKED_ARGS=$($lockedArgs -join ' ')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          cargo build --release --target $env:RUST_TARGET @lockedArgs
+          if ($LASTEXITCODE -ne 0) { throw "cargo build failed." }
 
           $targetDir = Join-Path $source "target\$env:RUST_TARGET\release"
           if (-not (Test-Path (Join-Path $targetDir "librtmp2.dll"))) {
@@ -149,7 +154,8 @@ jobs:
           Set-Location (Join-Path $env:GITHUB_WORKSPACE "librtmp2")
           $env:OPENSSL_DIR = Join-Path $env:VCPKG_ROOT_DIR "installed\$env:VCPKG_TRIPLET"
           $env:OPENSSL_STATIC = "1"
-          cargo test --release --all-features --target $env:RUST_TARGET -- --test-threads=1
+          $lockedArgs = @($env:CARGO_LOCKED_ARGS -split ' ' | Where-Object { $_ })
+          cargo test --release --all-features --target $env:RUST_TARGET @lockedArgs -- --test-threads=1
           if ($LASTEXITCODE -ne 0) { throw "librtmp2 tests failed." }
 
       - name: Create Windows package

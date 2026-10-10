@@ -73,9 +73,10 @@ jobs:
             def install
               ENV["OPENSSL_DIR"] = Formula["openssl@3"].opt_prefix
 
-              # The release source tarball ships no Cargo.lock (Rust library crates
-              # don't commit one), so --locked would abort instead of resolving it.
-              system "cargo", "build", "--release"
+              # Releases that ship a Cargo.lock are built with exactly those dependency
+              # versions; older source tarballs without one still resolve them.
+              locked = File.exist?("Cargo.lock") ? ["--locked"] : []
+              system "cargo", "build", "--release", *locked
 
               unless File.exist?("include/librtmp2/librtmp2.h")
                 mkdir_p "include/librtmp2"

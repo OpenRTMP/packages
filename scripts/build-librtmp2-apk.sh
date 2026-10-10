@@ -3,6 +3,7 @@ set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required}"
 ALPINE_BRANCH="${ALPINE_BRANCH:?ALPINE_BRANCH is required}"
+PKGREL="${PKGREL:-0}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PWD/output}"
 WORK_DIR="${WORK_DIR:-$PWD/apk-work}"
 REQUIRED_RUST_VERSION="1.93.0"
@@ -26,7 +27,7 @@ cat > APKBUILD <<EOF
 # Maintainer: OpenRTMP <info@openrtmp.org>
 pkgname=librtmp2
 pkgver=$VERSION
-pkgrel=0
+pkgrel=$PKGREL
 pkgdesc="RTMP and RTMPS protocol library"
 url="https://github.com/OpenRTMP/librtmp2"
 arch="$ARCH"
@@ -51,7 +52,15 @@ prepare() {
 }
 
 build() {
-    cargo build --release
+    # Record the SONAME of the runtime package's librtmp2.so.0 link, so programs
+    # linked against librtmp2-dev keep working once only librtmp2 is installed.
+    export RUSTFLAGS="\${RUSTFLAGS:-} -C link-arg=-Wl,-soname,librtmp2.so.0"
+    # Releases that ship a Cargo.lock build with exactly those versions.
+    if [ -f Cargo.lock ]; then
+        cargo build --release --locked
+    else
+        cargo build --release
+    fi
 }
 
 package() {
@@ -106,9 +115,9 @@ abuild undeps
 
 package_root="$HOME/packages"
 expected_packages=(
-    "librtmp2-$VERSION-r0.apk"
-    "librtmp2-dev-$VERSION-r0.apk"
-    "librtmp2-static-$VERSION-r0.apk"
+    "librtmp2-$VERSION-r$PKGREL.apk"
+    "librtmp2-dev-$VERSION-r$PKGREL.apk"
+    "librtmp2-static-$VERSION-r$PKGREL.apk"
 )
 
 for expected in "${expected_packages[@]}"; do
