@@ -1,18 +1,9 @@
 class Librtmp2 < Formula
   desc "Modern RTMP and RTMPS protocol library"
   homepage "https://github.com/OpenRTMP/librtmp2"
-  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.11.0/librtmp2-0.11.0-src.tar.gz"
-  sha256 "79d902f631b7de00557b482ca0c9af657d456e11743f362be898cfea7f4ba52d"
+  url "https://github.com/OpenRTMP/librtmp2/releases/download/v0.12.0/librtmp2-0.12.0-src.tar.gz"
+  sha256 "f91857493717591752aba3ead1e14d648aa54f543db0f4c7f0af47b2a17e8bdb"
   license "MIT"
-
-  bottle do
-    root_url "https://packages.openrtmp.org/homebrew/librtmp2/0.11.0"
-    sha256 cellar: :any, arm64_golden_gate: "5cbd84825e03b919a7f081b25852d00f4ba8ed38536c1c97ee1a5e21ed7b63ce"
-    sha256 cellar: :any, arm64_tahoe:       "f55154d38dafe1b5fc64bd63edbcb41f0f1626d84f283a6adc60b7e1c58d759d"
-    sha256 cellar: :any, arm64_sequoia:     "c7c48a85292edf853de659c14eb59c45405264de8008a71faf6a0931914a8efb"
-    sha256 cellar: :any, tahoe:             "385cfec0b013dd0a7e1643288b90a0ddcb7df7755813ee2796f310be013407fb"
-    sha256 cellar: :any, sequoia:           "feeca4f6efc242bc5a500c97682dc311604f4a3391d8d356bf2d1646771e4626"
-  end
 
   depends_on "cbindgen" => :build
   depends_on "pkgconf" => :build
@@ -22,9 +13,10 @@ class Librtmp2 < Formula
   def install
     ENV["OPENSSL_DIR"] = Formula["openssl@3"].opt_prefix
 
-    # The release source tarball ships no Cargo.lock (Rust library crates
-    # don't commit one), so --locked would abort instead of resolving it.
-    system "cargo", "build", "--release"
+    # Releases that ship a Cargo.lock are built with exactly those dependency
+    # versions; older source tarballs without one still resolve them.
+    locked = File.exist?("Cargo.lock") ? ["--locked"] : []
+    system "cargo", "build", "--release", *locked
 
     unless File.exist?("include/librtmp2/librtmp2.h")
       mkdir_p "include/librtmp2"
