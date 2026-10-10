@@ -102,14 +102,14 @@ jobs:
             gh run list \
               --repo "$GITHUB_REPOSITORY" \
               --workflow "$workflow" \
-              --limit 50 \
-              --json conclusion,displayTitle,headSha \
+              --commit "$GITHUB_SHA" \
+              --status failure \
+              --limit 100 \
+              --json displayTitle \
               | jq \
                   --arg version "$VERSION" \
                   --arg prefix "$run_prefix" \
-                  --arg sha "$GITHUB_SHA" \
                   '[.[]
-                    | select(.conclusion == "failure" and .headSha == $sha)
                     | select(
                         .displayTitle == ($prefix + " " + $version)
                         or .displayTitle == ($prefix + " v" + $version)
