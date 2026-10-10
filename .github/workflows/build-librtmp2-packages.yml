@@ -97,22 +97,19 @@ jobs:
             -e SOURCE_DIR=/workspace/librtmp2 -e OUTPUT_DIR=/workspace/output \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
             bash -euxo pipefail -c '
+              # Ubuntu 25.10+ ships the Rust coreutils as /usr/bin/rm. Under
+              # QEMU user emulation that rm cannot remove non-empty
+              # directories, so dpkg fails to clean /var/lib/dpkg/tmp.ci on
+              # every package it unpacks (Ubuntu 26.10 armhf). Divert rm to
+              # the GNU implementation the image also ships, so package
+              # upgrades cannot restore the Rust one mid-install.
+              if [[ "$(readlink -f /usr/bin/rm)" == */cargo/* && -x /usr/bin/gnurm ]]; then
+                dpkg-divert --local --rename --add /usr/bin/rm
+                ln -s gnurm /usr/bin/rm
+              fi
               apt-get update
-              # Ubuntu 26.10 armhf under QEMU can intermittently fail while
-              # cleaning /var/lib/dpkg/tmp.ci during a dpkg/perl-base upgrade.
-              # Retry only that combination; other distributions must fail fast.
-              for attempt in 1 2 3; do
-                if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-                  build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config; then
-                  break
-                fi
-                if [[ "$CODENAME" != stonking || "$EXPECTED_ARCHITECTURE" != armhf || "$attempt" -eq 3 ]]; then
-                  exit 1
-                fi
-                echo "Retrying Ubuntu 26.10 armhf package setup (attempt $((attempt + 1))/3)." >&2
-                rm -rf /var/lib/dpkg/tmp.ci
-                DEBIAN_FRONTEND=noninteractive dpkg --configure -a
-              done
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+                build-essential ca-certificates curl dpkg-dev git libssl-dev pkg-config
               rustup_args=(-y --profile minimal --default-toolchain 1.93.0)
               if [[ "$EXPECTED_ARCHITECTURE" == "i386" ]]; then
                 rustup_args+=(--default-host i686-unknown-linux-gnu)
@@ -125,8 +122,9 @@ jobs:
               rustc --version
               git clone --depth 1 --branch "v$VERSION" \
                 https://github.com/OpenRTMP/librtmp2.git "$SOURCE_DIR"
-              chmod +x scripts/build-librtmp2-deb.sh
+              chmod +x scripts/build-librtmp2-deb.sh scripts/test-librtmp2-deb.sh
               scripts/build-librtmp2-deb.sh
+              scripts/test-librtmp2-deb.sh
             '
 
       - uses: actions/upload-artifact@v7

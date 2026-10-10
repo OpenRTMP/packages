@@ -51,7 +51,15 @@ prepare() {
 }
 
 build() {
-    cargo build --release
+    # Record the SONAME of the runtime package's librtmp2.so.0 link, so programs
+    # linked against librtmp2-dev keep working once only librtmp2 is installed.
+    export RUSTFLAGS="\${RUSTFLAGS:-} -C link-arg=-Wl,-soname,librtmp2.so.0"
+    # Releases that ship a Cargo.lock build with exactly those versions.
+    if [ -f Cargo.lock ]; then
+        cargo build --release --locked
+    else
+        cargo build --release
+    fi
 }
 
 package() {
