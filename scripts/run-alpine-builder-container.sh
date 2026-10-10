@@ -40,4 +40,4 @@ EOF
 chown -R builder:builder /home/builder "$OUTPUT_DIR"
 
 exec su builder -c \
-  "VERSION='$VERSION' ALPINE_BRANCH='$ALPINE_BRANCH' OUTPUT_DIR='$OUTPUT_DIR' WORK_DIR='/home/builder/apk-work' /workspace/scripts/build-librtmp2-apk.sh"
+  "VERSION='$VERSION' PKGREL='${PKGREL:-0}' ALPINE_BRANCH='$ALPINE_BRANCH' OUTPUT_DIR='$OUTPUT_DIR' WORK_DIR='/home/builder/apk-work' /workspace/scripts/build-librtmp2-apk.sh"

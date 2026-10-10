@@ -9,11 +9,17 @@ on:
         description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
         required: true
         type: string
+      pkgrel:
+        description: "Alpine package revision; raise it to republish a fixed build of an already published version"
+        required: false
+        default: "0"
+        type: string
   repository_dispatch:
     types: [librtmp2-release]
 
 env:
   RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+  PKGREL: ${{ github.event.inputs.pkgrel || '0' }}
 
 concurrency:
   group: librtmp2-alpine-repository
@@ -98,6 +104,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [[ ! "$PKGREL" =~ ^(0|[1-9][0-9]*)$ ]]; then
+            echo "pkgrel must be a non-negative integer, got '$PKGREL'." >&2
+            exit 1
+          fi
+
           output="$GITHUB_WORKSPACE/output/$ALPINE_BRANCH/main/$ALPINE_ARCH"
           mkdir -p "$output"
           chmod +x scripts/build-librtmp2-apk.sh scripts/run-alpine-builder-container.sh
@@ -107,6 +118,7 @@ jobs:
             --volume "$GITHUB_WORKSPACE:/workspace" \
             --volume "$RUNNER_TEMP/alpine-keys:/keys:ro" \
             --env VERSION="$VERSION" \
+            --env PKGREL="$PKGREL" \
             --env ALPINE_BRANCH="$ALPINE_BRANCH" \
             --env OUTPUT_DIR="/workspace/output/$ALPINE_BRANCH/main/$ALPINE_ARCH" \
             "alpine:$IMAGE_TAG" \
