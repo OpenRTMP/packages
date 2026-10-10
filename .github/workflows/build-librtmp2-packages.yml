@@ -188,6 +188,13 @@ jobs:
               *+jammy1_*|*+noble1_*|*+resolute1_*|*+stonking1_*) destination=ubuntu ;;
               *) echo "Unknown package distribution: $filename" >&2; exit 1 ;;
             esac
+            # A published package file never changes: clients already pinned
+            # its checksum, and a rebuild would only add another copy of it
+            # to the repository history.
+            if [[ -e "$destination/pool/main/l/librtmp2/$filename" ]]; then
+              echo "Keeping already published $destination/pool/main/l/librtmp2/$filename"
+              continue
+            fi
             cp "$package" "$destination/pool/main/l/librtmp2/"
           done
 

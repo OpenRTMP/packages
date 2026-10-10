@@ -179,6 +179,13 @@ jobs:
             branch="${branch%-$arch}"
             destination="alpine/$branch/main/$arch"
             mkdir -p "$destination"
+            # A published package file never changes: clients and the signed
+            # index already pinned its checksum, and a rebuild from a retry run
+            # would only add another copy of it to the repository history.
+            if [[ -e "$destination/$(basename "$package")" ]]; then
+              echo "Keeping already published $destination/$(basename "$package")"
+              continue
+            fi
             cp "$package" "$destination/"
           done < <(find downloaded-alpine -mindepth 2 -type f -name '*.apk')
 
