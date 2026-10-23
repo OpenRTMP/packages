@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout package repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
@@ -125,7 +125,7 @@ jobs:
             /workspace/scripts/run-alpine-builder-container.sh
 
       - name: Upload APK packages
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: librtmp2-alpine-${{ matrix.branch }}-${{ matrix.arch }}
           path: output/${{ matrix.branch }}/main/${{ matrix.arch }}/*.apk
@@ -145,12 +145,12 @@ jobs:
 
     steps:
       - name: Checkout package repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: main
 
       - name: Download successful package artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         continue-on-error: true
         with:
           pattern: librtmp2-alpine-*
