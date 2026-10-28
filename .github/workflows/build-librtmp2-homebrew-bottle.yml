@@ -221,36 +221,60 @@ jobs:
           git push origin main
           echo "published=true" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy updated repository to Pages
-        if: steps.publish.outputs.published == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run page-deploy.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref main
-
       # The formula's bottle block must never point at bottles that
-      # packages.openrtmp.org doesn't serve yet, so wait for the Pages deploy.
-      - name: Wait for bottles on packages.openrtmp.org
+      # packages.openrtmp.org doesn't serve yet. Compare checksums, not just
+      # availability: a rebuilt release reuses the same bottle file names.
+      # Deploy Pages whenever the bottles aren't served yet, so a rerun after
+      # a failed deploy doesn't wait for files that never arrive.
+      - name: Deploy bottles to Pages and wait until they are served
         if: steps.bottles.outputs.available == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
+          PUBLISHED: ${{ steps.publish.outputs.published }}
         shell: bash
         run: |
           set -euo pipefail
-          for bottle in "homebrew/librtmp2/${VERSION}"/*.tar.gz; do
-            url="https://packages.openrtmp.org/${bottle}"
-            for _ in $(seq 1 60); do
-              if curl --fail --head --silent --show-error --location \
-                  --proto '=https' --tlsv1.2 "$url" > /dev/null; then
-                echo "Available: $url"
-                continue 2
+
+          served() {
+            local bottle="$1" expected actual
+            expected="$(shasum -a 256 "$bottle" | awk '{print $1}')"
+            actual="$(curl --fail --silent --show-error --location \
+              --proto '=https' --tlsv1.2 \
+              --connect-timeout 20 --max-time 300 \
+              "https://packages.openrtmp.org/${bottle}" \
+              | shasum -a 256 | awk '{print $1}')" || return 1
+            [[ "$actual" == "$expected" ]]
+          }
+
+          bottles=("homebrew/librtmp2/${VERSION}"/*.tar.gz)
+
+          deploy="$PUBLISHED"
+          if [[ "$deploy" != true ]]; then
+            for bottle in "${bottles[@]}"; do
+              if ! served "$bottle"; then
+                deploy=true
+                break
+              fi
+            done
+          fi
+
+          if [[ "$deploy" == true ]]; then
+            gh workflow run page-deploy.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref main
+          fi
+
+          deadline=$((SECONDS + 1800))
+          for bottle in "${bottles[@]}"; do
+            until served "$bottle"; do
+              if (( SECONDS >= deadline )); then
+                echo "Bottle is still not served after 30 minutes: $bottle" >&2
+                exit 1
               fi
               sleep 20
             done
-            echo "Bottle is still not served after 20 minutes: $url" >&2
-            exit 1
+            echo "Served: $bottle"
           done
 
       - name: Commit formula update to the Homebrew tap

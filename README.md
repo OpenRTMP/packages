@@ -160,12 +160,16 @@ Installing the fully qualified formula name
 automatically. To trust the whole tap up front instead, run
 `brew trust openrtmp/tap`.
 
-If you previously tapped this repository (`openrtmp/packages`),
-`brew update` moves an installed librtmp2 to `openrtmp/tap` on its own.
-Afterwards remove the old, much larger tap:
+If you previously tapped this repository (`openrtmp/packages`), move to
+the new tap. `brew update` migrates an installed librtmp2 on its own only
+when `openrtmp/tap` is already trusted; otherwise it prints a notice and
+leaves librtmp2 where it is. Either way, these steps move it and remove
+the old, much larger tap:
 
 ```bash
+brew uninstall librtmp2
 brew untap openrtmp/packages
+brew install openrtmp/tap/librtmp2
 ```
 
 The formula is updated automatically when a new librtmp2 release is published.
