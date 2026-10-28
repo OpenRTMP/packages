@@ -35,6 +35,15 @@ jobs:
           ref: main
           fetch-depth: 1
 
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: OpenRTMP/homebrew-tap
+          ref: main
+          path: homebrew-tap
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Resolve latest librtmp2 release
         id: release
         env:
@@ -57,6 +66,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
+          FORMULA_DIR: ${{ github.workspace }}/homebrew-tap
         shell: bash
         run: |
           set -euo pipefail

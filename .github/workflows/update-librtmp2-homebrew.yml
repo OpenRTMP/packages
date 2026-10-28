@@ -12,8 +12,10 @@ on:
   repository_dispatch:
     types: [librtmp2-release]
 
+# The formula lives in OpenRTMP/homebrew-tap; pushing there uses the
+# HOMEBREW_TAP_TOKEN secret, not github.token.
 permissions:
-  contents: write
+  contents: read
 
 env:
   RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
@@ -27,10 +29,13 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - name: Checkout package repository
+      - name: Checkout Homebrew tap
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          repository: OpenRTMP/homebrew-tap
           ref: main
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
       - name: Resolve source archive
         id: source
@@ -54,6 +59,7 @@ jobs:
           VERSION: ${{ steps.source.outputs.version }}
           SOURCE_SHA256: ${{ steps.source.outputs.sha256 }}
         shell: bash
+        working-directory: homebrew-tap
         run: |
           set -euo pipefail
           mkdir -p Formula
@@ -131,6 +137,7 @@ jobs:
         env:
           VERSION: ${{ steps.source.outputs.version }}
         shell: bash
+        working-directory: homebrew-tap
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -146,12 +153,3 @@ jobs:
           git commit -m "Update Homebrew formula for librtmp2 $VERSION"
           git push origin main
           echo "published=true" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy updated repository to Pages
-        if: steps.publish.outputs.published == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh workflow run page-deploy.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref main

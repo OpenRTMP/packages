@@ -41,6 +41,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: OpenRTMP/homebrew-tap
+          ref: main
+          path: homebrew-tap
+          persist-credentials: false
+
       - name: Resolve version
         id: version
         shell: bash
@@ -52,14 +60,15 @@ jobs:
       - name: Verify Homebrew formula targets this version
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          FORMULA_DIR: ${{ github.workspace }}/homebrew-tap
         shell: bash
         run: |
           set -euo pipefail
           chmod +x scripts/check-librtmp2-additional-package-completeness.sh
           scripts/check-librtmp2-additional-package-completeness.sh homebrew
 
-      - name: Tap this checkout
-        run: brew tap openrtmp/packages "$PWD"
+      - name: Tap the Homebrew tap checkout
+        run: brew tap openrtmp/tap "$PWD/homebrew-tap"
 
       - name: Build and bottle librtmp2
         id: bottle
@@ -68,11 +77,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          brew install --formula --build-bottle openrtmp/packages/librtmp2
-          brew test openrtmp/packages/librtmp2
+          brew install --formula --build-bottle openrtmp/tap/librtmp2
+          brew test openrtmp/tap/librtmp2
           brew bottle --no-rebuild --json \
             --root-url "https://packages.openrtmp.org/homebrew/librtmp2/${VERSION}" \
-            openrtmp/packages/librtmp2
+            openrtmp/tap/librtmp2
 
           json="$(find . -maxdepth 1 -name 'librtmp2--*.json' -print -quit)"
           tarball="$(find . -maxdepth 1 -name 'librtmp2--*.tar.gz' -print -quit)"
@@ -111,6 +120,16 @@ jobs:
         with:
           ref: main
 
+      # Pushing to the tap needs the HOMEBREW_TAP_TOKEN secret; github.token
+      # can only write to this repository.
+      - name: Checkout Homebrew tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: OpenRTMP/homebrew-tap
+          ref: main
+          path: homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
       - name: Resolve version
         id: version
         shell: bash
@@ -138,11 +157,11 @@ jobs:
             echo "No bottle artifacts are available; nothing to publish."
           fi
 
-      - name: Tap and trust this checkout
+      - name: Tap and trust the Homebrew tap checkout
         if: steps.bottles.outputs.available == 'true'
         run: |
-          brew tap openrtmp/packages "$PWD"
-          brew trust --formula openrtmp/packages/librtmp2
+          brew tap openrtmp/tap "$PWD/homebrew-tap"
+          brew trust --formula openrtmp/tap/librtmp2
 
       - name: Merge bottle metadata into formula
         if: steps.bottles.outputs.available == 'true'
@@ -159,8 +178,8 @@ jobs:
               ./*.json
           )
 
-          tap_formula="$(brew --repo openrtmp/packages)/Formula/librtmp2.rb"
-          cp "$tap_formula" Formula/librtmp2.rb
+          tap_formula="$(brew --repo openrtmp/tap)/Formula/librtmp2.rb"
+          cp "$tap_formula" homebrew-tap/Formula/librtmp2.rb
 
       - name: Move bottles into the package repository
         if: steps.bottles.outputs.available == 'true'
@@ -180,7 +199,7 @@ jobs:
             mv "$bottle" "$dest/$(basename "${bottle/--/-}")"
           done
 
-      - name: Commit formula and bottle update
+      - name: Commit bottle update
         id: publish
         if: steps.bottles.outputs.available == 'true'
         env:
@@ -190,11 +209,11 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/librtmp2.rb "homebrew/librtmp2/${VERSION}"
+          git add "homebrew/librtmp2/${VERSION}"
 
           if git diff --cached --quiet; then
             echo "published=false" >> "$GITHUB_OUTPUT"
-            echo "Homebrew bottle metadata is already up to date."
+            echo "Homebrew bottles are already up to date."
             exit 0
           fi
 
@@ -202,11 +221,78 @@ jobs:
           git push origin main
           echo "published=true" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy updated repository to Pages
-        if: steps.publish.outputs.published == 'true'
+      # The formula's bottle block must never point at bottles that
+      # packages.openrtmp.org doesn't serve yet. Compare checksums, not just
+      # availability: a rebuilt release reuses the same bottle file names.
+      # Deploy Pages whenever the bottles aren't served yet, so a rerun after
+      # a failed deploy doesn't wait for files that never arrive.
+      - name: Deploy bottles to Pages and wait until they are served
+        if: steps.bottles.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PUBLISHED: ${{ steps.publish.outputs.published }}
+        shell: bash
         run: |
-          gh workflow run page-deploy.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref main
+          set -euo pipefail
+
+          served() {
+            local bottle="$1" expected actual
+            expected="$(shasum -a 256 "$bottle" | awk '{print $1}')"
+            actual="$(curl --fail --silent --show-error --location \
+              --proto '=https' --tlsv1.2 \
+              --connect-timeout 20 --max-time 300 \
+              "https://packages.openrtmp.org/${bottle}" \
+              | shasum -a 256 | awk '{print $1}')" || return 1
+            [[ "$actual" == "$expected" ]]
+          }
+
+          bottles=("homebrew/librtmp2/${VERSION}"/*.tar.gz)
+
+          deploy="$PUBLISHED"
+          if [[ "$deploy" != true ]]; then
+            for bottle in "${bottles[@]}"; do
+              if ! served "$bottle"; then
+                deploy=true
+                break
+              fi
+            done
+          fi
+
+          if [[ "$deploy" == true ]]; then
+            gh workflow run page-deploy.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref main
+          fi
+
+          deadline=$((SECONDS + 1800))
+          for bottle in "${bottles[@]}"; do
+            until served "$bottle"; do
+              if (( SECONDS >= deadline )); then
+                echo "Bottle is still not served after 30 minutes: $bottle" >&2
+                exit 1
+              fi
+              sleep 20
+            done
+            echo "Served: $bottle"
+          done
+
+      - name: Commit formula update to the Homebrew tap
+        if: steps.bottles.outputs.available == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        working-directory: homebrew-tap
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/librtmp2.rb
+
+          if git diff --cached --quiet; then
+            echo "Homebrew bottle metadata is already up to date."
+            exit 0
+          fi
+
+          git commit -m "Add bottles for librtmp2 $VERSION"
+          git push origin main

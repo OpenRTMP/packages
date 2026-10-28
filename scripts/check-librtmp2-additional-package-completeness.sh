@@ -3,6 +3,8 @@ set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required}"
 ROOT_DIR="${ROOT_DIR:-$PWD}"
+# Checkout of OpenRTMP/homebrew-tap, which holds Formula/librtmp2.rb.
+FORMULA_DIR="${FORMULA_DIR:-$ROOT_DIR}"
 
 usage() {
     echo "Usage: $0 <rpm|arch|homebrew|homebrew_bottle|windows>" >&2
@@ -80,8 +82,8 @@ check_arch() {
 }
 
 check_homebrew() {
-    if [[ ! -f "$ROOT_DIR/Formula/librtmp2.rb" ]] \
-        || ! grep -Fq "/releases/download/v${VERSION}/librtmp2-${VERSION}-src.tar.gz" "$ROOT_DIR/Formula/librtmp2.rb"; then
+    if [[ ! -f "$FORMULA_DIR/Formula/librtmp2.rb" ]] \
+        || ! grep -Fq "/releases/download/v${VERSION}/librtmp2-${VERSION}-src.tar.gz" "$FORMULA_DIR/Formula/librtmp2.rb"; then
         echo "Homebrew formula for librtmp2 $VERSION is incomplete."
         return 1
     fi
@@ -94,8 +96,8 @@ check_homebrew_bottle() {
     local base="homebrew/librtmp2/${VERSION}"
     local tag
 
-    if [[ ! -f "$ROOT_DIR/Formula/librtmp2.rb" ]] \
-        || ! grep -Fq "https://packages.openrtmp.org/homebrew/librtmp2/${VERSION}" "$ROOT_DIR/Formula/librtmp2.rb"; then
+    if [[ ! -f "$FORMULA_DIR/Formula/librtmp2.rb" ]] \
+        || ! grep -Fq "https://packages.openrtmp.org/homebrew/librtmp2/${VERSION}" "$FORMULA_DIR/Formula/librtmp2.rb"; then
         missing=1
     fi
 
