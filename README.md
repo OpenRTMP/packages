@@ -145,27 +145,28 @@ sudo pacman -Syu librtmp2
 
 ## Homebrew
 
-The repository also acts as a Homebrew tap. Because the GitHub repository is
-named `packages` rather than `homebrew-packages`, add it with its explicit
-remote once:
+The Homebrew formula lives in its own tap,
+[OpenRTMP/homebrew-tap](https://github.com/OpenRTMP/homebrew-tap), so
+`brew` only clones that small repository instead of this one:
 
 ```bash
-brew tap openrtmp/packages https://github.com/OpenRTMP/packages
-brew install openrtmp/packages/librtmp2
+brew install openrtmp/tap/librtmp2
 ```
 
-Run the `brew tap` command with the explicit URL first. `brew install
-openrtmp/packages/librtmp2` on its own will try to auto-tap using
-Homebrew's default naming convention (`homebrew-packages`), which doesn't
-exist and fails to clone.
-
 Homebrew 6.0+ requires third-party taps to be trusted before their
-formulae are loaded ([Tap Trust](https://docs.brew.sh/Tap-Trust)), so
-`brew tap` may print `Invalid formula` / `untrusted tap` warnings the
-first time — this is expected. Installing the fully qualified formula
-name (`brew install openrtmp/packages/librtmp2`) trusts just that
-formula automatically. To trust the whole tap up front instead, run
-`brew trust openrtmp/packages`.
+formulae are loaded ([Tap Trust](https://docs.brew.sh/Tap-Trust)).
+Installing the fully qualified formula name
+(`brew install openrtmp/tap/librtmp2`) trusts just that formula
+automatically. To trust the whole tap up front instead, run
+`brew trust openrtmp/tap`.
+
+If you previously tapped this repository (`openrtmp/packages`),
+`brew update` moves an installed librtmp2 to `openrtmp/tap` on its own.
+Afterwards remove the old, much larger tap:
+
+```bash
+brew untap openrtmp/packages
+```
 
 The formula is updated automatically when a new librtmp2 release is published.
 On macOS Sequoia, Tahoe, and Golden Gate (arm64) - plus Sequoia and Tahoe
