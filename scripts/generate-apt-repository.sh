@@ -25,7 +25,8 @@ for codename in "${CODENAMES[@]}"; do
         mkdir -p "$binary_dir"
 
         find "$POOL_DIR" -maxdepth 1 -type f \
-            -name "*+${codename}1_${architecture}.deb" \
+            \( -name "*+${codename}1_${architecture}.deb" \
+               -o -name "*~${codename}1_${architecture}.deb" \) \
             -exec cp {} "$temp_dir/" \;
 
         if compgen -G "$temp_dir/*.deb" > /dev/null; then
