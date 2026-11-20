@@ -9,6 +9,11 @@ on:
         description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
         required: true
         type: string
+      revision:
+        description: RPM package release revision (defaults to 1 for each new upstream release)
+        required: false
+        default: '1'
+        type: string
   repository_dispatch:
     types: [librtmp2-release]
 
@@ -18,6 +23,7 @@ concurrency:
 
 env:
   RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+  RPM_RELEASE: ${{ github.event.inputs.revision || '1' }}
 
 jobs:
   build:
@@ -77,12 +83,13 @@ jobs:
           EXPECTED_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
+          [[ "$RPM_RELEASE" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid RPM revision: $RPM_RELEASE" >&2; exit 1; }
           output="artifact/rpm/$FAMILY/$RELEASE/$EXPECTED_ARCH"
           mkdir -p "$output"
           chmod +x scripts/build-librtmp2-rpm.sh
 
           docker run --rm --platform "$PLATFORM" \
-            -e VERSION -e FAMILY -e RELEASE -e RELEASE_TAG -e EXPECTED_ARCH \
+            -e VERSION -e RPM_RELEASE -e FAMILY -e RELEASE -e RELEASE_TAG -e EXPECTED_ARCH \
             -e SOURCE_DIR=/workspace/librtmp2 \
             -e OUTPUT_DIR="/workspace/$output" \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
