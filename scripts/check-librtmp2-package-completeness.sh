@@ -29,7 +29,7 @@ check_glob() {
 
 check_apt() {
     local missing=0
-    local target root codename arch package_version
+    local target root codename arch
     local -a targets=(
         "debian:bookworm:amd64"
         "debian:bookworm:arm64"
@@ -72,10 +72,10 @@ check_apt() {
 
     for target in "${targets[@]}"; do
         IFS=: read -r root codename arch <<< "$target"
-        package_version="${VERSION}-1~${codename}1"
-
-        check_file "$root/pool/main/l/librtmp2/librtmp2_${package_version}_${arch}.deb" || missing=1
-        check_file "$root/pool/main/l/librtmp2/librtmp2-dev_${package_version}_${arch}.deb" || missing=1
+        # Any published Debian packaging revision is acceptable, including
+        # compatibility packages created before the version format change.
+        check_glob "$root/pool/main/l/librtmp2/librtmp2_${VERSION}-*~${codename}1_${arch}.deb" || missing=1
+        check_glob "$root/pool/main/l/librtmp2/librtmp2-dev_${VERSION}-*~${codename}1_${arch}.deb" || missing=1
         check_file "$root/dists/$codename/main/binary-$arch/Packages" || missing=1
         check_file "$root/dists/$codename/main/binary-$arch/Packages.gz" || missing=1
     done
