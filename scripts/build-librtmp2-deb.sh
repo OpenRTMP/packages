@@ -6,7 +6,7 @@ CODENAME="${CODENAME:?CODENAME is required}"
 SOURCE_DIR="${SOURCE_DIR:-$PWD/librtmp2}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PWD/output}"
 ARCH="$(dpkg --print-architecture)"
-PACKAGE_VERSION="${VERSION}-1+${CODENAME}1"
+PACKAGE_VERSION="${VERSION}-1~${CODENAME}1"
 MULTIARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
 
 mkdir -p "$OUTPUT_DIR"
