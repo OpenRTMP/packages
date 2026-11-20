@@ -60,10 +60,19 @@ check_rpm() {
 check_arch() {
     local missing=0
     local base="arch/x86_64"
-    local package="$base/librtmp2-${VERSION}-[0-9]*-x86_64.pkg.tar.zst"
+    local archive signed_package=false
 
-    check_glob "$package" || missing=1
-    check_glob "$package.sig" || missing=1
+    # A package and a signature from different revisions are not a pair.
+    for archive in "$ROOT_DIR/$base"/librtmp2-"${VERSION}"-[0-9]*-x86_64.pkg.tar.zst; do
+        if [[ -f "$archive" && -f "$archive.sig" ]]; then
+            signed_package=true
+            break
+        fi
+    done
+    if [[ "$signed_package" != true ]]; then
+        echo "Missing signed Arch package: $base/librtmp2-${VERSION}-<pkgrel>-x86_64.pkg.tar.zst"
+        missing=1
+    fi
     check_file "$base/openrtmp.db" || missing=1
     check_file "$base/openrtmp.db.sig" || missing=1
     check_file "$base/openrtmp.db.tar.gz" || missing=1
