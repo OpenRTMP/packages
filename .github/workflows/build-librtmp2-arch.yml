@@ -9,6 +9,11 @@ on:
         description: "librtmp2 release version, for example 0.6.0 or v0.6.0"
         required: true
         type: string
+      pkgrel:
+        description: Arch package release revision (defaults to 1 for each new upstream release)
+        required: false
+        default: '1'
+        type: string
   repository_dispatch:
     types: [librtmp2-release]
 
@@ -18,6 +23,7 @@ concurrency:
 
 env:
   RAW_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
+  PKGREL: ${{ github.event.inputs.pkgrel || '1' }}
 
 jobs:
   build:
@@ -46,11 +52,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
+          [[ "$PKGREL" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid Arch pkgrel: $PKGREL" >&2; exit 1; }
           mkdir -p artifact/arch/x86_64
           chmod +x scripts/build-librtmp2-arch.sh
 
           docker run --rm \
-            -e VERSION \
+            -e VERSION -e PKGREL \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
             archlinux:base-devel \
             bash -euxo pipefail -c '
@@ -60,7 +67,7 @@ jobs:
               mkdir -p /tmp/package-output
               chown -R builder:builder /tmp/package-output
               chmod +x /workspace/scripts/build-librtmp2-arch.sh
-              su - builder -c "VERSION=$VERSION OUTPUT_DIR=/tmp/package-output /workspace/scripts/build-librtmp2-arch.sh"
+              su - builder -c "VERSION=$VERSION PKGREL=$PKGREL OUTPUT_DIR=/tmp/package-output /workspace/scripts/build-librtmp2-arch.sh"
               cp /tmp/package-output/*.pkg.tar.zst /workspace/artifact/arch/x86_64/
             '
 
@@ -151,11 +158,12 @@ jobs:
           # would make repo-add try to read a file it just deleted.
           docker run --rm \
             -e VERSION="${RAW_VERSION#v}" \
+            -e PKGREL \
             -v "$GITHUB_WORKSPACE:/repo" \
             archlinux:base-devel \
             bash -euxo pipefail -c '
               shopt -s nullglob
-              packages=(/repo/arch/x86_64/librtmp2-"$VERSION"-*.pkg.tar.zst)
+              packages=(/repo/arch/x86_64/librtmp2-"$VERSION"-"$PKGREL"-x86_64.pkg.tar.zst)
               [[ "${#packages[@]}" -eq 1 ]] || {
                 echo "Expected exactly one Arch package for $VERSION, found ${#packages[@]}." >&2
                 exit 1
