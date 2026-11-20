@@ -3,6 +3,44 @@
 This repository publishes native packages for Debian, Ubuntu, Alpine, Fedora,
 Enterprise Linux, openSUSE, Arch Linux, Homebrew, and Windows.
 
+## Package versioning
+
+All packages use the **same upstream librtmp2 release** (`v0.17.1` is the
+current example), while each target keeps its package manager's native
+version format. Do not force Debian suffixes onto RPM, APK, Arch, Homebrew,
+or Windows builds.
+
+| Target | Example for librtmp2 v0.17.1 | New upstream release | Rebuild of the same release |
+| --- | --- | --- | --- |
+| Debian 13 (APT) | `0.17.1-1~trixie1` | Debian revision `1` | Increase `revision`, e.g. `-2~trixie1` |
+| Ubuntu 26.04 (APT) | `0.17.1-1~resolute1` | Debian revision `1` | Increase `revision`, e.g. `-2~resolute1` |
+| Ubuntu 26.10 (APT) | `0.17.1-1~stonking1` | Debian revision `1` | Increase `revision`, e.g. `-2~stonking1` |
+| Fedora 44 (RPM) | `0.17.1-1.fc44` | RPM release `1` | Increase `revision`, e.g. `2.fc44` |
+| Enterprise Linux 10 (RPM) | `0.17.1-1.el10` | RPM release `1` | Increase `revision`, e.g. `2.el10` |
+| openSUSE Leap 16.0 (RPM) | `0.17.1-1.suse160` | RPM release `1` | Increase `revision`, e.g. `2.suse160` |
+| Alpine (APK) | `0.17.1-r0` | Alpine `pkgrel=0` | Increase `pkgrel`, e.g. `-r1` |
+| Arch Linux | `0.17.1-1` | Arch `pkgrel=1` | Increase `pkgrel`, e.g. `-2` |
+| Homebrew | `0.17.1` | No formula revision | Use a formula `revision 1` only if a same-version formula rebuild is required |
+| Windows (signed ZIP) | `librtmp2-0.17.1-windows-x86_64.zip` | Upstream version in filename | Publish a new release for changed binaries |
+
+All example numbers are for the same upstream release, **not** a request
+to rebuild or republish it. For release `v0.18.0`, the defaults reset to
+APT `-1~<codename>1`, RPM `-1.<dist>`, Alpine `-r0`, Arch `-1`,
+and Homebrew/Windows `0.18.0`.
+
+Each native packaging workflow follows this default automatically on
+`repository_dispatch` and offers a revision override when started
+manually. The GitHub Release version remains the single source of truth.
+Do not introduce an RPM/Debian epoch unless a real version-ordering
+migration requires it. Existing published files are not renamed.
+
+The Launchpad PPA in `OpenRTMP/librtmp2` independently uses a signed
+Debian source-package version such as
+`0.17.1-1~resolute15r1`: its run/attempt suffix makes re-uploads unique.
+Its numeric value may differ from the separately hosted APT binary
+repository; both still share the same upstream version.
+
+
 ## Debian repository
 
 Supported releases:
