@@ -42,8 +42,8 @@ check_rpm() {
         IFS=: read -r family release release_tag <<< "$target"
         for arch in "${arches[@]}"; do
             base="rpm/$family/$release/$arch"
-            check_glob "$base/librtmp2-${VERSION}-1.${release_tag}.${arch}.rpm" || missing=1
-            check_glob "$base/librtmp2-devel-${VERSION}-1.${release_tag}.${arch}.rpm" || missing=1
+            check_glob "$base/librtmp2-${VERSION}-[0-9]*.${release_tag}.${arch}.rpm" || missing=1
+            check_glob "$base/librtmp2-devel-${VERSION}-[0-9]*.${release_tag}.${arch}.rpm" || missing=1
             check_file "$base/repodata/repomd.xml" || missing=1
             check_file "$base/repodata/repomd.xml.asc" || missing=1
         done
@@ -60,10 +60,10 @@ check_rpm() {
 check_arch() {
     local missing=0
     local base="arch/x86_64"
-    local package="$base/librtmp2-${VERSION}-1-x86_64.pkg.tar.zst"
+    local package="$base/librtmp2-${VERSION}-[0-9]*-x86_64.pkg.tar.zst"
 
-    check_file "$package" || missing=1
-    check_file "$package.sig" || missing=1
+    check_glob "$package" || missing=1
+    check_glob "$package.sig" || missing=1
     check_file "$base/openrtmp.db" || missing=1
     check_file "$base/openrtmp.db.sig" || missing=1
     check_file "$base/openrtmp.db.tar.gz" || missing=1
