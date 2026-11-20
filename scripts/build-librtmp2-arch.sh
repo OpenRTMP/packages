@@ -2,6 +2,8 @@
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required}"
+PKGREL="${PKGREL:-1}"
+[[ "$PKGREL" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid Arch pkgrel: $PKGREL" >&2; exit 1; }
 OUTPUT_DIR="${OUTPUT_DIR:-$PWD/output}"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
@@ -18,7 +20,7 @@ SOURCE_SHA256="$(sha256sum "librtmp2-${VERSION}.tar.gz" | awk '{print $1}')"
 cat > PKGBUILD <<'PKGBUILD'
 pkgname=librtmp2
 pkgver=@VERSION@
-pkgrel=1
+pkgrel=@PKGREL@
 pkgdesc='RTMP and RTMPS protocol library'
 arch=('x86_64')
 url='https://github.com/OpenRTMP/librtmp2'
@@ -78,12 +80,13 @@ PKGBUILD
 
 sed -i \
     -e "s/@VERSION@/$VERSION/g" \
+    -e "s/@PKGREL@/$PKGREL/g" \
     -e "s/@SHA256@/$SOURCE_SHA256/g" \
     PKGBUILD
 
 makepkg --clean --cleanbuild --force --noconfirm
 
-package="$(find . -maxdepth 1 -type f -name "librtmp2-${VERSION}-*.pkg.tar.zst" -print -quit)"
+package="$(find . -maxdepth 1 -type f -name "librtmp2-${VERSION}-${PKGREL}-*.pkg.tar.zst" -print -quit)"
 [[ -n "$package" ]] || { echo "Arch package was not created." >&2; exit 1; }
 cp "$package" "$OUTPUT_DIR/"
 
