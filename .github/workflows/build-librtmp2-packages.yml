@@ -9,6 +9,11 @@ on:
         description: librtmp2 release version, for example 0.6.0 or v0.6.0
         required: true
         type: string
+      revision:
+        description: Debian packaging revision (defaults to 1 for each new upstream release)
+        required: false
+        default: '1'
+        type: string
   repository_dispatch:
     types: [librtmp2-release]
 
@@ -18,6 +23,7 @@ concurrency:
 
 env:
   RAW_VERSION: ${{ inputs.version || github.event.client_payload.version }}
+  DEB_REVISION: ${{ inputs.revision || '1' }}
 
 jobs:
   build:
@@ -91,9 +97,10 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
           EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
         run: |
+          [[ "$DEB_REVISION" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid Debian revision: $DEB_REVISION" >&2; exit 1; }
           mkdir -p output
           docker run --rm --platform "$PLATFORM" \
-            -e VERSION -e CODENAME -e EXPECTED_ARCHITECTURE \
+            -e VERSION -e DEB_REVISION -e CODENAME -e EXPECTED_ARCHITECTURE \
             -e SOURCE_DIR=/workspace/librtmp2 -e OUTPUT_DIR=/workspace/output \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
             bash -euxo pipefail -c '
