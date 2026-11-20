@@ -2,6 +2,8 @@
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required}"
+RPM_RELEASE="${RPM_RELEASE:-1}"
+[[ "$RPM_RELEASE" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid RPM release: $RPM_RELEASE" >&2; exit 1; }
 RELEASE_TAG="${RELEASE_TAG:?RELEASE_TAG is required}"
 SOURCE_DIR="${SOURCE_DIR:-$PWD/librtmp2}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PWD/output}"
@@ -51,7 +53,7 @@ SPEC_FILE="$RPM_TOPDIR/SPECS/librtmp2.spec"
 cat > "$SPEC_FILE" <<EOF
 Name:           librtmp2
 Version:        $VERSION
-Release:        1.$RELEASE_TAG
+Release:        $RPM_RELEASE.$RELEASE_TAG
 Summary:        RTMP and RTMPS protocol library
 License:        MIT
 URL:            https://github.com/OpenRTMP/librtmp2
@@ -98,7 +100,7 @@ install -Dm644 %{source_dir}/LICENSE \
 %{_includedir}/librtmp2/librtmp2.h
 
 %changelog
-* Mon Sep 07 2026 OpenRTMP <info@openrtmp.org> - $VERSION-1.$RELEASE_TAG
+* Mon Sep 07 2026 OpenRTMP <info@openrtmp.org> - $VERSION-$RPM_RELEASE.$RELEASE_TAG
 - Automated OpenRTMP package build
 EOF
 
