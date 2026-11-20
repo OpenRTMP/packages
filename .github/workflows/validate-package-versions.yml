@@ -35,6 +35,10 @@ jobs:
             bash -n "$script"
           done
 
+      - name: Test package completeness regressions
+        shell: bash
+        run: bash scripts/test-package-completeness-regressions.sh
+
       - name: Check native version templates
         shell: bash
         run: |
