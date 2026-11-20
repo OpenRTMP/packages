@@ -26,6 +26,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The repository contains many large published package binaries;
+          # validation needs scripts only, not a full packages checkout.
+          sparse-checkout: |
+            scripts
+            .github/workflows
 
       - name: Check Bash script syntax
         shell: bash
