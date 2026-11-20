@@ -2,11 +2,13 @@
 set -euo pipefail
 
 VERSION="${VERSION:?VERSION is required}"
+DEB_REVISION="${DEB_REVISION:-1}"
+[[ "$DEB_REVISION" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid Debian package revision: $DEB_REVISION" >&2; exit 1; }
 CODENAME="${CODENAME:?CODENAME is required}"
 SOURCE_DIR="${SOURCE_DIR:-$PWD/librtmp2}"
 OUTPUT_DIR="${OUTPUT_DIR:-$PWD/output}"
 ARCH="$(dpkg --print-architecture)"
-PACKAGE_VERSION="${VERSION}-1~${CODENAME}1"
+PACKAGE_VERSION="${VERSION}-${DEB_REVISION}~${CODENAME}1"
 MULTIARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
 
 mkdir -p "$OUTPUT_DIR"
