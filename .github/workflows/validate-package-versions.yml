@@ -1,0 +1,62 @@
+name: Validate package versioning
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build-librtmp2-*.yml'
+      - '.github/workflows/validate-package-versions.yml'
+      - 'scripts/**'
+      - 'README.md'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-librtmp2-*.yml'
+      - '.github/workflows/validate-package-versions.yml'
+      - 'scripts/**'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Native package versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check Bash script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+
+      - name: Check native version templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These native formats intentionally differ across package managers.
+          grep -Fq 'PACKAGE_VERSION="${VERSION}-${DEB_REVISION}~${CODENAME}1"' scripts/build-librtmp2-deb.sh
+          grep -Fq 'PACKAGE_VERSION="${VERSION}-${DEB_REVISION}~${CODENAME}1"' scripts/test-librtmp2-deb.sh
+          grep -Fq 'Release:        $RPM_RELEASE.$RELEASE_TAG' scripts/build-librtmp2-rpm.sh
+          grep -Fq 'pkgver=$VERSION' scripts/build-librtmp2-apk.sh
+          grep -Fq 'pkgrel=$PKGREL' scripts/build-librtmp2-apk.sh
+          grep -Fq 'pkgrel=@PKGREL@' scripts/build-librtmp2-arch.sh
+
+      - name: Verify Debian package upgrade ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Existing repository packages through 0.15.0 use the old + suffix.
+          dpkg --compare-versions '0.17.1-1~resolute1' gt '0.15.0-1+resolute1'
+          # Keep the one-time downgrade caveat for the *same* upstream version.
+          dpkg --compare-versions '0.17.1-1~resolute1' lt '0.17.1-1+resolute1'
+          # New upstream versions supersede packaging-only rebuilds.
+          dpkg --compare-versions '0.18.0-1~resolute1' gt '0.17.1-2~resolute1'
+          # PPA releases with an upload suffix sort above the regular repo
+          # when the upstream version, Debian revision and series match.
+          dpkg --compare-versions '0.17.1-1~resolute15r1' gt '0.17.1-1~resolute1'
