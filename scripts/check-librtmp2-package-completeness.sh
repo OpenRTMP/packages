@@ -74,8 +74,16 @@ check_apt() {
         IFS=: read -r root codename arch <<< "$target"
         # Any published Debian packaging revision is acceptable, including
         # compatibility packages created before the version format change.
-        check_glob "$root/pool/main/l/librtmp2/librtmp2_${VERSION}-*~${codename}1_${arch}.deb" || missing=1
-        check_glob "$root/pool/main/l/librtmp2/librtmp2-dev_${VERSION}-*~${codename}1_${arch}.deb" || missing=1
+        if ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2_${VERSION}-*~${codename}1_${arch}.deb" >/dev/null \
+           && ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2_${VERSION}-1+${codename}1_${arch}.deb" >/dev/null; then
+            echo "Missing runtime APT package: $root/$codename/$arch ($VERSION)"
+            missing=1
+        fi
+        if ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2-dev_${VERSION}-*~${codename}1_${arch}.deb" >/dev/null \
+           && ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2-dev_${VERSION}-1+${codename}1_${arch}.deb" >/dev/null; then
+            echo "Missing development APT package: $root/$codename/$arch ($VERSION)"
+            missing=1
+        fi
         check_file "$root/dists/$codename/main/binary-$arch/Packages" || missing=1
         check_file "$root/dists/$codename/main/binary-$arch/Packages.gz" || missing=1
     done
