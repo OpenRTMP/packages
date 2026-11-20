@@ -184,8 +184,8 @@ jobs:
           find downloaded-packages -type f -name '*.deb' -print0 | while IFS= read -r -d '' package; do
             filename="$(basename "$package")"
             case "$filename" in
-              *+bookworm1_*|*+trixie1_*) destination=debian ;;
-              *+jammy1_*|*+noble1_*|*+resolute1_*|*+stonking1_*) destination=ubuntu ;;
+              *~bookworm1_*|*~trixie1_*|*+bookworm1_*|*+trixie1_*) destination=debian ;;
+              *~jammy1_*|*~noble1_*|*~resolute1_*|*~stonking1_*|*+jammy1_*|*+noble1_*|*+resolute1_*|*+stonking1_*) destination=ubuntu ;;
               *) echo "Unknown package distribution: $filename" >&2; exit 1 ;;
             esac
             # A published package file never changes: clients already pinned
