@@ -46,6 +46,21 @@ sudo apt update
 sudo apt install librtmp2 librtmp2-dev
 ```
 
+### APT package versioning
+
+APT packages use the standard non-native Debian version format
+`<upstream>-<revision>~<codename>1` (for example,
+`0.17.1-1~resolute1` or `0.17.1-1~stonking1`).
+The upstream version is taken from the librtmp2 release tag, and the
+Debian packaging revision defaults to `1` again for every new
+upstream release (including patch releases).
+
+Previously published packages named `<upstream>-1+<codename>1` are
+retained in the APT pools and metadata for compatibility. The new
+format is used starting with newly published versions; republishing
+an *identical* already published upstream version with the new format
+would require increasing the packaging revision to avoid a downgrade.
+
 ## Alpine repository
 
 Supported branches:
