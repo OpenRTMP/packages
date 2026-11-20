@@ -27,6 +27,30 @@ check_glob() {
     return 0
 }
 
+# Package revisions must match: librtmp2-dev has an exact-version runtime
+# dependency. Keep accepting both existing +codename1 and new ~codename1
+# packages without mixing revisions between the two.
+check_apt_package_pair() {
+    local root="$1" codename="$2" arch="$3"
+    local pool="$ROOT_DIR/$root/pool/main/l/librtmp2"
+    local runtime package_version
+
+    for runtime in "$pool"/librtmp2_"${VERSION}"-*~"${codename}"1_"${arch}".deb \
+                   "$pool"/librtmp2_"${VERSION}"-1+"${codename}"1_"${arch}".deb; do
+        [[ -f "$runtime" ]] || continue
+        package_version="${runtime##*/}"
+        package_version="${package_version#librtmp2_}"
+        package_version="${package_version%_${arch}.deb}"
+
+        if [[ -f "$pool/librtmp2-dev_${package_version}_${arch}.deb" ]]; then
+            return 0
+        fi
+    done
+
+    echo "Missing matching runtime/development APT package pair: $root/$codename/$arch ($VERSION)"
+    return 1
+}
+
 check_apt() {
     local missing=0
     local target root codename arch
@@ -72,18 +96,7 @@ check_apt() {
 
     for target in "${targets[@]}"; do
         IFS=: read -r root codename arch <<< "$target"
-        # Any published Debian packaging revision is acceptable, including
-        # compatibility packages created before the version format change.
-        if ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2_${VERSION}-*~${codename}1_${arch}.deb" >/dev/null \
-           && ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2_${VERSION}-1+${codename}1_${arch}.deb" >/dev/null; then
-            echo "Missing runtime APT package: $root/$codename/$arch ($VERSION)"
-            missing=1
-        fi
-        if ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2-dev_${VERSION}-*~${codename}1_${arch}.deb" >/dev/null \
-           && ! compgen -G "$ROOT_DIR/$root/pool/main/l/librtmp2/librtmp2-dev_${VERSION}-1+${codename}1_${arch}.deb" >/dev/null; then
-            echo "Missing development APT package: $root/$codename/$arch ($VERSION)"
-            missing=1
-        fi
+        check_apt_package_pair "$root" "$codename" "$arch" || missing=1
         check_file "$root/dists/$codename/main/binary-$arch/Packages" || missing=1
         check_file "$root/dists/$codename/main/binary-$arch/Packages.gz" || missing=1
     done
