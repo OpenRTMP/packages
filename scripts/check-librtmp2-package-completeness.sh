@@ -72,7 +72,7 @@ check_apt() {
 
     for target in "${targets[@]}"; do
         IFS=: read -r root codename arch <<< "$target"
-        package_version="${VERSION}-1+${codename}1"
+        package_version="${VERSION}-1~${codename}1"
 
         check_file "$root/pool/main/l/librtmp2/librtmp2_${package_version}_${arch}.deb" || missing=1
         check_file "$root/pool/main/l/librtmp2/librtmp2-dev_${package_version}_${arch}.deb" || missing=1
