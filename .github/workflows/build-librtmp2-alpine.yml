@@ -241,11 +241,12 @@ jobs:
           git push origin main
           echo "published=true" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy updated repository to Pages
+      - name: Deploy updated repository to SFTP
         if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run page-deploy.yml \
+          gh workflow run publish-sftp.yml \
             --repo "$GITHUB_REPOSITORY" \
-            --ref main
+            --ref main \
+              -f target=alpine

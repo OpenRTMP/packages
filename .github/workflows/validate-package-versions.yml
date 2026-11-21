@@ -92,8 +92,8 @@ jobs:
             guard="$(step_if "$step" | normalized_if)"
             [[ "$guard" == "steps.packages.outputs.available == 'true' && steps.sort.outputs.changed == 'true'" ]]
           done
-          pages_guard="$(step_if "Deploy updated repository to Pages" | normalized_if)"
-          [[ "$pages_guard" == "steps.packages.outputs.available == 'true'" ]]
+          deploy_guard="$(step_if "Deploy updated repository to SFTP" | normalized_if)"
+          [[ "$deploy_guard" == "steps.packages.outputs.available == 'true'" ]]
 
       - name: Verify Debian package upgrade ordering
         shell: bash

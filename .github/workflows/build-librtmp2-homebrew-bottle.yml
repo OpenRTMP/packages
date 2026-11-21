@@ -260,9 +260,10 @@ jobs:
           fi
 
           if [[ "$deploy" == true ]]; then
-            gh workflow run page-deploy.yml \
+            gh workflow run publish-sftp.yml \
               --repo "$GITHUB_REPOSITORY" \
-              --ref main
+              --ref main \
+              -f target=homebrew
           fi
 
           deadline=$((SECONDS + 1800))
