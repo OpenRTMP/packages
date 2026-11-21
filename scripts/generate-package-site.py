@@ -40,15 +40,6 @@ def package_tree(repo: Path) -> dict[str, dict[str, tuple[bool, int]]]:
     return directories
 
 
-def human_size(size: int) -> str:
-    value = float(size)
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
-        if value < 1024 or unit == "TiB":
-            return f"{int(value)} {unit}" if unit == "B" else f"{value:.1f} {unit}"
-        value /= 1024
-    return str(size)
-
-
 def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
     parts = directory.split("/")
     up = "../" * len(parts)
@@ -63,7 +54,7 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
         rows.append(
             '<tr data-file-row><td><a href="../" class="file-link">'
             '<span class="file-icon">↰</span> Parent directory</a></td>'
-            '<td class="metadata">Directory</td><td class="metadata">—</td></tr>'
+            '<td class="metadata">Directory</td></tr>'
         )
 
     for name, (is_directory, size) in sorted(
@@ -73,12 +64,10 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
         label = escape(name + ("/" if is_directory else ""))
         icon = "▣" if is_directory else "↧"
         kind = "Directory" if is_directory else ("Link" if size == -2 else "File")
-        display_size = "—"
         rows.append(
             f'<tr data-file-row><td><a class="file-link" href="{href}">'
             f'<span class="file-icon">{icon}</span>{label}</a></td>'
-            f'<td class="metadata">{kind}</td>'
-            f'<td class="metadata">{display_size}</td></tr>'
+            f'<td class="metadata">{kind}</td></tr>'
         )
 
     title = escape(directory + "/")
@@ -123,7 +112,7 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
       </div>
       <div class="table-scroll">
         <table>
-          <thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Size</th></tr></thead>
+          <thead><tr><th scope="col">Name</th><th scope="col">Type</th></tr></thead>
           <tbody data-file-rows>{''.join(rows)}</tbody>
         </table>
         <p class="no-results" data-no-results hidden>No files match your search.</p>
