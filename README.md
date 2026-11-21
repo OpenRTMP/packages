@@ -309,8 +309,12 @@ a valid HTTPS certificate before the cutover.
 The [SFTP publishing workflow](.github/workflows/publish-sftp.yml) replaces
 GitHub Pages. Every successful push to `main` runs site validation,
 synchronizes the seven package families, and publishes the website and
-generated directory indexes. A manual `workflow_dispatch` provides a
-`full_sync` switch for recovery/migration.
+generated directory indexes. The package-build workflows explicitly dispatch
+this publisher because a commit pushed using `GITHUB_TOKEN` does not itself
+trigger another workflow. Each builder publishes only its affected target:
+`apt` selects Debian and Ubuntu; Alpine, RPM, Arch, Homebrew, and Windows
+select their respective repositories. Manual `workflow_dispatch` supports a
+`target` choice (default `all`) and a `full_sync` switch for recovery.
 
 ### One-time GitHub configuration
 
@@ -350,14 +354,21 @@ repository's `.github` or `scripts` folders.
 3. Verify the package signing keys, APT `InRelease`/`Packages.gz`,
    Alpine `APKINDEX.tar.gz`, RPM `repodata`, Arch `openrtmp.db`,
    and a sample large download on the new host.
-4. Switch the DNS record of `packages.openrtmp.org` to the new host and
+4. Test a replacement of an existing file through SFTP in a dedicated test
+   directory. Confirm the SFTP server permits temporary-file upload followed
+   by a rename over the existing file; otherwise do **not** enable production
+   publishing until the transport is adapted.
+5. Switch the DNS record of `packages.openrtmp.org` to the new host and
    disable GitHub Pages in the repository settings when cutover succeeds.
    Keep the old hosting available until DNS caches have expired.
 
 The **first** successful publish copies all existing files for each
 platform. Each subsequent publish reads a remote per-platform commit
-marker from `.openrtmp-publish-state/`, fetches the Git diff, and uploads
-only new/modified files. If a transfer fails, the marker is not advanced.
+marker from `.openrtmp-publish-state/`, compares Git trees with a full-history
+but blob-filtered checkout, and uploads only new/modified files. The job
+aborts if the remote marker is newer or unrelated, rather than rolling back
+the live repository during a stale workflow retry. If a transfer fails,
+the marker is not advanced.
 The publisher intentionally **does not delete** old package archives from
 the server, to preserve already-published download URLs. Manual
 `full_sync` rechecks all objects against the destination.
@@ -366,7 +377,9 @@ Each platform runs on its own shallow, blob-filtered checkout. No single
 GitHub runner needs to download the complete multi-gigabyte package tree.
 The lightweight [site generator](scripts/generate-package-site.py)
 constructs static, searchable directory indexes from Git metadata, without
-downloading the package blobs. The handcrafted homepage and assets live in
+downloading the package blobs. File sizes are intentionally not shown in the
+HTML browser because reading them would hydrate the complete multi-gigabyte
+tree in a blob-filtered checkout. The handcrafted homepage and assets live in
 [`site/`](site/).
 
 **Note:** This workflow requires **SFTP** connectivity to the hosting
@@ -374,3 +387,13 @@ account. HTTPS access to a control panel alone does not establish SFTP
 access. If the host only offers FTPS/FTP, the publishing transport must be
 adapted before production deployment. GitHub Actions cannot configure
 the remote virtual host or DNS automatically.
+
+Uploads use lftp temporary-file transfer and overwrite-in-place semantics:
+a file is transferred under a temporary name in the same directory and then
+renamed. The hosting SFTP server **must** support replacing an existing file
+by rename without deleting the old file first. This protects individual files
+against interrupted uploads but **does not** make an entire multi-file
+repository metadata update transactional; installers retrying during a
+metadata rollover may temporarily observe a mixed generation. Signed indexes
+are always required, and the full hosting cutover requires an end-to-end
+package-manager smoke test.
