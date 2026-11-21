@@ -89,7 +89,7 @@ fi
 if [[ -z "$previous" ]]; then
   # Partial checkout downloads only this matrix target's blobs, rather than
   # the complete multi-GB repository or all of its history.
-  git sparse-checkout set "$mode"
+  git sparse-checkout set "$mode" scripts
   echo "Initial full sync of $mode."
   remote_command "mkdir -p \"$remote\"; mirror -R --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
 elif [[ "$previous" == "$current" ]]; then
