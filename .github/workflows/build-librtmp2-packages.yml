@@ -294,4 +294,4 @@ jobs:
           gh workflow run publish-sftp.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
-              -f target=all
+              -f target=apt
