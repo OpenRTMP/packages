@@ -39,6 +39,17 @@ jobs:
             grep -Fq 'gh workflow run publish-sftp.yml' ".github/workflows/build-librtmp2-$workflow.yml"
           done
 
+      - name: Protect deployments to existing SFTP document roots
+        run: |
+          # The webroot is provisioned by the hosting panel. Some SFTP
+          # servers reject mkdir -p if that directory already exists.
+          grep -Fq 'remote_command "cd \"$remote\""' scripts/deploy-packages-sftp.sh
+          if grep -Fq 'mkdir -p \"$remote\"' scripts/deploy-packages-sftp.sh; then
+            echo "Do not attempt to recreate the existing SFTP document root." >&2
+            exit 1
+          fi
+          grep -Fq 'mkdir -pf \"$state_dir\"' scripts/deploy-packages-sftp.sh
+
       - name: Compile Python generator
         run: python3 -m py_compile scripts/generate-package-site.py
 
