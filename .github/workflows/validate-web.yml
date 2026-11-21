@@ -20,6 +20,7 @@ jobs:
           sparse-checkout: |
             scripts
             site
+            .github/workflows
 
       - name: Lint deployment shell
         run: |
@@ -27,6 +28,16 @@ jobs:
           if command -v shellcheck >/dev/null 2>&1; then
             shellcheck scripts/deploy-packages-sftp.sh
           fi
+
+      - name: Ensure builders dispatch the live SFTP publisher
+        run: |
+          if grep -R --include='build-librtmp2-*.yml' -F 'page-deploy.yml' .github/workflows; then
+            echo "Legacy GitHub Pages dispatch found." >&2
+            exit 1
+          fi
+          for workflow in packages alpine arch rpm windows homebrew-bottle; do
+            grep -Fq 'gh workflow run publish-sftp.yml' ".github/workflows/build-librtmp2-$workflow.yml"
+          done
 
       - name: Compile Python generator
         run: python3 -m py_compile scripts/generate-package-site.py
@@ -45,6 +56,9 @@ jobs:
           test -s "$RUNNER_TEMP/generated/alpine/index.html"
           test -s "$RUNNER_TEMP/generated/rpm/index.html"
           test -s "$RUNNER_TEMP/generated/arch/index.html"
+          test -s "$RUNNER_TEMP/generated/arch/x86_64/index.html"
+          grep -Fq 'openrtmp.db.sig' "$RUNNER_TEMP/generated/arch/x86_64/index.html"
+          grep -Fq 'openrtmp.files.sig' "$RUNNER_TEMP/generated/arch/x86_64/index.html"
           test -s "$RUNNER_TEMP/generated/windows/index.html"
           test -s "$RUNNER_TEMP/generated/homebrew/index.html"
           if grep -R -Fq 'href="undefined"' "$RUNNER_TEMP/generated"; then
