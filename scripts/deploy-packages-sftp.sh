@@ -42,7 +42,7 @@ if [[ "$remote" != /* ]]; then
   remote="${remote#./}"
 fi
 
-connection="set cmd:fail-exit yes; set net:max-retries 3; set net:timeout 90; set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts\";"
+connection="set cmd:fail-exit yes; set net:max-retries 3; set net:timeout 90; set xfer:disk-full-fatal yes; set xfer:use-temp-file yes; set mirror:overwrite yes; set sftp:connect-program \"ssh -a -x -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts\";"
 remote_command() {
   lftp --env-password -u "$DEPLOY_USERNAME" -p "$DEPLOY_PORT" \
     "sftp://$DEPLOY_HOST" -e "$connection $1; bye"
@@ -51,7 +51,7 @@ remote_command() {
 if [[ "$mode" == "site" ]]; then
   python3 scripts/generate-package-site.py --output "$RUNNER_TEMP/package-site"
   echo "Publishing static website and indexes to $DEPLOY_HOST."
-  remote_command "mkdir -p \"$remote\"; mirror -R --no-perms --transfer-all --parallel=3 \"$RUNNER_TEMP/package-site\" \"$remote\""
+  remote_command "mkdir -p \"$remote\"; mirror -R --overwrite --no-perms --transfer-all --parallel=3 \"$RUNNER_TEMP/package-site\" \"$remote\""
   exit 0
 fi
 
@@ -67,6 +67,9 @@ if [[ -s "$local_state" ]]; then
   candidate="$(tr -d '\r\n' < "$local_state")"
   if [[ "$candidate" =~ ^[0-9a-f]{40}$ ]]; then
     previous="$candidate"
+  else
+    echo "Invalid remote $mode marker; refusing an unsafe fallback to full sync." >&2
+    exit 1
   fi
 fi
 
@@ -75,9 +78,10 @@ if [[ -n "$previous" && "$previous" != "$current" ]]; then
   if ! git cat-file -e "$previous^{commit}" 2>/dev/null; then
     git fetch --quiet --no-tags --filter=blob:none origin "$previous" || true
   fi
-  if ! git merge-base --is-ancestor "$previous" HEAD 2>/dev/null; then
-    echo "Previous SHA cannot be diffed; performing full $mode publish."
-    previous=""
+  if ! git merge-base --is-ancestor "$previous" "$current" 2>/dev/null; then
+    echo "Refusing to deploy $current: remote $mode already records $previous, which is not an ancestor." >&2
+    echo "This is an out-of-order retry or a corrupt marker; refusing to downgrade published packages." >&2
+    exit 1
   fi
 fi
 
@@ -91,7 +95,7 @@ if [[ -z "$previous" ]]; then
   # the complete multi-GB repository or all of its history.
   git sparse-checkout set "$mode" scripts
   echo "Initial full sync of $mode."
-  remote_command "mkdir -p \"$remote\"; mirror -RL --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
+  remote_command "mkdir -p \"$remote\"; mirror -RL --overwrite --transfer-all --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
 elif [[ "$previous" == "$current" ]]; then
   echo "$mode already at the current commit; no files to transfer."
 else
@@ -137,7 +141,7 @@ else
     echo "Publishing $changed changed $mode files, not the full repository."
     # Delta files are always transferred even when size/mtime match.
     # Historical package files are retained rather than pruned.
-    remote_command "mkdir -p \"$remote\"; mirror -R --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
+    remote_command "mkdir -p \"$remote\"; mirror -R --overwrite --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
   else
     echo "No new or modified $mode packages."
   fi
