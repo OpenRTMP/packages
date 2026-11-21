@@ -71,12 +71,24 @@ jobs:
             .github/workflows/build-librtmp2-packages.yml
           # Metadata generation, key import, signing and the commit must each
           # carry the no-op gate; a single occurrence could leave one of them
-          # rewriting metadata on a retry.
-          gate_count="$(grep -Fc "steps.sort.outputs.changed == 'true'" \
-            .github/workflows/build-librtmp2-packages.yml)"
-          [[ "$gate_count" -ge 4 ]]
-          grep -Fq "steps.packages.outputs.available == 'true'" \
-            .github/workflows/build-librtmp2-packages.yml
+          # rewriting metadata on a retry. Extract each step's own if-line
+          # instead of counting matches anywhere in the file.
+          step_if() {
+            awk -v name="$1" '
+              $0 ~ "- name: " name { found = 1; next }
+              found && /^[[:space:]]+if:/ { print; exit }
+            ' .github/workflows/build-librtmp2-packages.yml
+          }
+          for step in \
+            "Generate APT metadata" \
+            "Import signing key" \
+            "Sign Debian and Ubuntu metadata" \
+            "Commit repository update"
+          do
+            step_if "$step" | grep -Fq "steps.sort.outputs.changed == 'true'"
+          done
+          step_if "Deploy updated repository to Pages" |
+            grep -Fq "steps.packages.outputs.available == 'true'"
 
       - name: Verify Debian package upgrade ordering
         shell: bash
