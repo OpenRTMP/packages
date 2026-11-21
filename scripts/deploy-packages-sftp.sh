@@ -48,10 +48,16 @@ remote_command() {
     "sftp://$DEPLOY_HOST" -e "$connection $1; bye"
 }
 
+# DEPLOY_REMOTE_PATH names an existing vhost document root, not a directory
+# to provision. On some chrooted SFTP servers, mkdir -p on an existing
+# directory returns SSH_FX_FAILURE even though cd into it succeeds.
+# Check access before hydrating multi-gigabyte package blobs.
+remote_command "cd \"$remote\""
+
 if [[ "$mode" == "site" ]]; then
   python3 scripts/generate-package-site.py --output "$RUNNER_TEMP/package-site"
   echo "Publishing static website and indexes to $DEPLOY_HOST."
-  remote_command "mkdir -p \"$remote\"; mirror -R --overwrite --no-perms --transfer-all --parallel=3 \"$RUNNER_TEMP/package-site\" \"$remote\""
+  remote_command "mirror -R --overwrite --no-perms --transfer-all --parallel=3 \"$RUNNER_TEMP/package-site\" \"$remote\""
   exit 0
 fi
 
@@ -95,7 +101,7 @@ if [[ -z "$previous" ]]; then
   # the complete multi-GB repository or all of its history.
   git sparse-checkout set "$mode" scripts
   echo "Initial full sync of $mode."
-  remote_command "mkdir -p \"$remote\"; mirror -RL --overwrite --transfer-all --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
+  remote_command "mirror -RL --overwrite --transfer-all --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
 elif [[ "$previous" == "$current" ]]; then
   echo "$mode already at the current commit; no files to transfer."
 else
@@ -141,7 +147,7 @@ else
     echo "Publishing $changed changed $mode files, not the full repository."
     # Delta files are always transferred even when size/mtime match.
     # Historical package files are retained rather than pruned.
-    remote_command "mkdir -p \"$remote\"; mirror -R --overwrite --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
+    remote_command "mirror -R --overwrite --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
   else
     echo "No new or modified $mode packages."
   fi
@@ -149,5 +155,5 @@ fi
 
 # Advance the state marker only after a complete successful upload.
 printf '%s\n' "$current" > "$RUNNER_TEMP/openrtmp-current.sha"
-remote_command "mkdir -p \"$state_dir\"; put \"$RUNNER_TEMP/openrtmp-current.sha\" -o \"$state_file\""
+remote_command "mkdir -pf \"$state_dir\"; put \"$RUNNER_TEMP/openrtmp-current.sha\" -o \"$state_file\""
 echo "$mode is synced to $current."
