@@ -86,6 +86,11 @@ touch "$alpine_base/librtmp2-${VERSION}-r1.apk" \
       "$alpine_base/librtmp2-static-${VERSION}-r1.apk"
 expect_pass bash "$APT_CHECK" alpine
 
+# A static package from a different revision must fail on its own too.
+rm "$alpine_base/librtmp2-static-${VERSION}-r1.apk"
+touch "$alpine_base/librtmp2-static-${VERSION}-r2.apk"
+expect_fail bash "$APT_CHECK" alpine
+
 # RPM: librtmp2-devel requires the exact runtime version-release. A runtime
 # and devel from different releases are not an installable pair.
 for target in fedora:44:fc44 el:9:el9 el:10:el10 opensuse:16.0:suse160; do

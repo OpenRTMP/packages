@@ -65,7 +65,11 @@ jobs:
           # repository checker, not by the matrix result.
           grep -Fq "if: always() && needs.build.result != 'cancelled'" \
             .github/workflows/build-librtmp2-packages.yml
-          grep -Fq "continue-on-error: true" \
+          grep -Fq "continue-on-error:" \
+            .github/workflows/build-librtmp2-packages.yml
+          grep -Fq "needs.build.result != 'success'" \
+            .github/workflows/build-librtmp2-packages.yml
+          grep -Fq "steps.sort.outputs.changed == 'true'" \
             .github/workflows/build-librtmp2-packages.yml
 
       - name: Verify Debian package upgrade ordering
