@@ -76,8 +76,12 @@ jobs:
           step_if() {
             awk -v name="$1" '
               $0 ~ "- name: " name { found = 1; next }
-              found && /^[[:space:]]+if:/ { print; exit }
+              found && /^[[:space:]]*- name:/ { exit 1 }
+              found && /^[[:space:]]+if:/ { print; exit 0 }
             ' .github/workflows/build-librtmp2-packages.yml
+          }
+          normalized_if() {
+            sed -E 's/^[[:space:]]*if:[[:space:]]*//; s/\r$//'
           }
           for step in \
             "Generate APT metadata" \
@@ -85,10 +89,11 @@ jobs:
             "Sign Debian and Ubuntu metadata" \
             "Commit repository update"
           do
-            step_if "$step" | grep -Fq "steps.sort.outputs.changed == 'true'"
+            guard="$(step_if "$step" | normalized_if)"
+            [[ "$guard" == "steps.packages.outputs.available == 'true' && steps.sort.outputs.changed == 'true'" ]]
           done
-          step_if "Deploy updated repository to Pages" |
-            grep -Fq "steps.packages.outputs.available == 'true'"
+          pages_guard="$(step_if "Deploy updated repository to Pages" | normalized_if)"
+          [[ "$pages_guard" == "steps.packages.outputs.available == 'true'" ]]
 
       - name: Verify Debian package upgrade ordering
         shell: bash
