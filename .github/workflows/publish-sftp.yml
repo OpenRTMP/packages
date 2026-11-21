@@ -6,6 +6,12 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      target:
+        description: "Select which repositories to publish"
+        required: true
+        type: choice
+        default: all
+        options: [all, apt, debian, ubuntu, alpine, rpm, arch, windows, homebrew]
       full_sync:
         description: "Re-upload every package (for host migration/recovery)"
         required: false
@@ -25,6 +31,7 @@ jobs:
 
   packages:
     needs: validate
+    if: ${{ github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'apt' || inputs.target == 'debian' || inputs.target == 'ubuntu' || inputs.target == 'alpine' || inputs.target == 'rpm' || inputs.target == 'arch' || inputs.target == 'windows' || inputs.target == 'homebrew' }}
     runs-on: ubuntu-latest
     environment: production
     strategy:
@@ -37,7 +44,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 1
+          fetch-depth: 0
           filter: blob:none
           sparse-checkout: scripts
 
@@ -47,6 +54,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends lftp
 
       - name: Sync native package files
+        if: ${{ github.event_name == 'push' || inputs.target == 'all' || inputs.target == matrix.target || (inputs.target == 'apt' && (matrix.target == 'debian' || matrix.target == 'ubuntu')) }}
         env:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST || 'vweb03.eu' }}
           DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
