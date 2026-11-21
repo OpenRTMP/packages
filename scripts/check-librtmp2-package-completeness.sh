@@ -18,15 +18,6 @@ check_file() {
     return 0
 }
 
-check_glob() {
-    local pattern="$1"
-    if ! compgen -G "$ROOT_DIR/$pattern" > /dev/null; then
-        echo "Missing: $pattern"
-        return 1
-    fi
-    return 0
-}
-
 # Package revisions must match: librtmp2-dev has an exact-version runtime
 # dependency. Keep accepting both existing +codename1 and new ~codename1
 # packages without mixing revisions between the two.
@@ -118,16 +109,32 @@ check_apt() {
 
 check_alpine() {
     local missing=0
-    local branch arch base
+    local branch arch base runtime revision paired
     local -a branches=(v3.21 v3.22 v3.23 v3.24 edge)
     local -a arches=(x86_64 x86 aarch64 armv7 ppc64le riscv64 s390x)
 
     for branch in "${branches[@]}"; do
         for arch in "${arches[@]}"; do
             base="alpine/$branch/main/$arch"
-            check_glob "$base/librtmp2-${VERSION}-r*.apk" || missing=1
-            check_glob "$base/librtmp2-dev-${VERSION}-r*.apk" || missing=1
-            check_glob "$base/librtmp2-static-${VERSION}-r*.apk" || missing=1
+            paired=false
+            # librtmp2-dev and librtmp2-static pin the runtime with an exact
+            # pkgver-pkgrel dependency, so a mixed -rN set cannot be installed.
+            # Pick one revision that has all three packages.
+            for runtime in "$ROOT_DIR/$base"/librtmp2-"${VERSION}"-r*.apk; do
+                [[ -f "$runtime" ]] || continue
+                revision="${runtime##*/}"
+                revision="${revision#librtmp2-${VERSION}-r}"
+                revision="${revision%.apk}"
+                if [[ -f "$ROOT_DIR/$base/librtmp2-dev-${VERSION}-r${revision}.apk" \
+                    && -f "$ROOT_DIR/$base/librtmp2-static-${VERSION}-r${revision}.apk" ]]; then
+                    paired=true
+                    break
+                fi
+            done
+            if [[ "$paired" != true ]]; then
+                echo "Missing matching runtime/development/static APK set: $base ($VERSION)"
+                missing=1
+            fi
             check_file "$base/APKINDEX.tar.gz" || missing=1
         done
     done

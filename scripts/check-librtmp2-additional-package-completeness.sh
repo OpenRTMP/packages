@@ -19,17 +19,9 @@ check_file() {
     fi
 }
 
-check_glob() {
-    local pattern="$1"
-    if ! compgen -G "$ROOT_DIR/$pattern" > /dev/null; then
-        echo "Missing: $pattern"
-        return 1
-    fi
-}
-
 check_rpm() {
     local missing=0
-    local target family release release_tag arch base
+    local target family release release_tag arch base runtime version_release paired
     local -a targets=(
         "fedora:44:fc44"
         "el:9:el9"
@@ -42,8 +34,24 @@ check_rpm() {
         IFS=: read -r family release release_tag <<< "$target"
         for arch in "${arches[@]}"; do
             base="rpm/$family/$release/$arch"
-            check_glob "$base/librtmp2-${VERSION}-[0-9]*.${release_tag}.${arch}.rpm" || missing=1
-            check_glob "$base/librtmp2-devel-${VERSION}-[0-9]*.${release_tag}.${arch}.rpm" || missing=1
+            paired=false
+            # librtmp2-devel pins the runtime with an exact version-release
+            # dependency, so a mixed -N.<dist> set cannot be installed. Pick
+            # one release that has both packages.
+            for runtime in "$ROOT_DIR/$base"/librtmp2-"${VERSION}"-[0-9]*.${release_tag}.${arch}.rpm; do
+                [[ -f "$runtime" ]] || continue
+                version_release="${runtime##*/}"
+                version_release="${version_release#librtmp2-}"
+                version_release="${version_release%.${release_tag}.${arch}.rpm}"
+                if [[ -f "$ROOT_DIR/$base/librtmp2-devel-${version_release}.${release_tag}.${arch}.rpm" ]]; then
+                    paired=true
+                    break
+                fi
+            done
+            if [[ "$paired" != true ]]; then
+                echo "Missing matching runtime/development RPM pair: $base ($VERSION)"
+                missing=1
+            fi
             check_file "$base/repodata/repomd.xml" || missing=1
             check_file "$base/repodata/repomd.xml.asc" || missing=1
         done

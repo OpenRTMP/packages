@@ -56,6 +56,45 @@ jobs:
           grep -Fq 'pkgrel=$PKGREL' scripts/build-librtmp2-apk.sh
           grep -Fq 'pkgrel=@PKGREL@' scripts/build-librtmp2-arch.sh
 
+      - name: Check APT publish gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One failed emulated leg must not discard every other
+          # architecture's packages; completeness is enforced by the
+          # repository checker, not by the matrix result.
+          grep -Fq "if: always() && needs.build.result != 'cancelled'" \
+            .github/workflows/build-librtmp2-packages.yml
+          grep -Fq "continue-on-error:" \
+            .github/workflows/build-librtmp2-packages.yml
+          grep -Fq "needs.build.result != 'success'" \
+            .github/workflows/build-librtmp2-packages.yml
+          # Metadata generation, key import, signing and the commit must each
+          # carry the no-op gate; a single occurrence could leave one of them
+          # rewriting metadata on a retry. Extract each step's own if-line
+          # instead of counting matches anywhere in the file.
+          step_if() {
+            awk -v name="$1" '
+              $0 ~ "- name: " name { found = 1; next }
+              found && /^[[:space:]]*- name:/ { exit 1 }
+              found && /^[[:space:]]+if:/ { print; exit 0 }
+            ' .github/workflows/build-librtmp2-packages.yml
+          }
+          normalized_if() {
+            sed -E 's/^[[:space:]]*if:[[:space:]]*//; s/[[:space:]]+#.*$//; s/\r$//'
+          }
+          for step in \
+            "Generate APT metadata" \
+            "Import signing key" \
+            "Sign Debian and Ubuntu metadata" \
+            "Commit repository update"
+          do
+            guard="$(step_if "$step" | normalized_if)"
+            [[ "$guard" == "steps.packages.outputs.available == 'true' && steps.sort.outputs.changed == 'true'" ]]
+          done
+          pages_guard="$(step_if "Deploy updated repository to Pages" | normalized_if)"
+          [[ "$pages_guard" == "steps.packages.outputs.available == 'true'" ]]
+
       - name: Verify Debian package upgrade ordering
         shell: bash
         run: |
