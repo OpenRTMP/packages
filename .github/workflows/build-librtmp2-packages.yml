@@ -283,7 +283,11 @@ jobs:
           echo "published=true" >> "$GITHUB_OUTPUT"
 
       - name: Deploy updated repository to Pages
-        if: steps.publish.outputs.published == 'true'
+        # A retry may find the packages already on main and make no new
+        # commit. The explicit dispatch is the only recovery path because a
+        # push made with GITHUB_TOKEN does not trigger the Pages workflow, so
+        # deploy whenever artifacts were handled, not only after a new commit.
+        if: steps.packages.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

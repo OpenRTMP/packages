@@ -69,7 +69,13 @@ jobs:
             .github/workflows/build-librtmp2-packages.yml
           grep -Fq "needs.build.result != 'success'" \
             .github/workflows/build-librtmp2-packages.yml
-          grep -Fq "steps.sort.outputs.changed == 'true'" \
+          # Metadata generation, key import, signing and the commit must each
+          # carry the no-op gate; a single occurrence could leave one of them
+          # rewriting metadata on a retry.
+          gate_count="$(grep -Fc "steps.sort.outputs.changed == 'true'" \
+            .github/workflows/build-librtmp2-packages.yml)"
+          [[ "$gate_count" -ge 4 ]]
+          grep -Fq "steps.packages.outputs.available == 'true'" \
             .github/workflows/build-librtmp2-packages.yml
 
       - name: Verify Debian package upgrade ordering
