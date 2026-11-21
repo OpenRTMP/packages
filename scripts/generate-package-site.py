@@ -26,7 +26,7 @@ def package_tree(repo: Path) -> dict[str, dict[str, tuple[bool, int]]]:
     for record in filter(None, data.split(b"\0")):
         metadata, filename = record.split(b"\t", 1)
         mode, kind, _sha, size = metadata.decode("ascii").split(" ")
-        if kind != "blob" or mode == "120000":
+        if kind != "blob":
             continue
 
         parts = PurePosixPath(filename.decode("utf-8")).parts
@@ -35,7 +35,7 @@ def package_tree(repo: Path) -> dict[str, dict[str, tuple[bool, int]]]:
             directories[parent][parts[depth - 1]] = (True, 0)
 
         parent = "/".join(parts[:-1])
-        directories[parent][parts[-1]] = (False, int(size))
+        directories[parent][parts[-1]] = (False, -1 if mode == "120000" else int(size))
 
     return directories
 
@@ -72,8 +72,8 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
         href = quote(name, safe="") + ("/" if is_directory else "")
         label = escape(name + ("/" if is_directory else ""))
         icon = "▣" if is_directory else "↧"
-        kind = "Directory" if is_directory else "File"
-        display_size = "—" if is_directory else human_size(size)
+        kind = "Directory" if is_directory else ("Link" if size < 0 else "File")
+        display_size = "—" if is_directory or size < 0 else human_size(size)
         rows.append(
             f'<tr data-file-row><td><a class="file-link" href="{href}">'
             f'<span class="file-icon">{icon}</span>{label}</a></td>'
