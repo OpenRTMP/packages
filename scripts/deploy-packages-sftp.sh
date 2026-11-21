@@ -91,7 +91,7 @@ if [[ -z "$previous" ]]; then
   # the complete multi-GB repository or all of its history.
   git sparse-checkout set "$mode" scripts
   echo "Initial full sync of $mode."
-  remote_command "mkdir -p \"$remote\"; mirror -R --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
+  remote_command "mkdir -p \"$remote\"; mirror -RL --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
 elif [[ "$previous" == "$current" ]]; then
   echo "$mode already at the current commit; no files to transfer."
 else
@@ -105,9 +105,63 @@ else
     case "$path" in "$mode/"*) ;; *) echo "Unsafe package path: $path" >&2; exit 1 ;; esac
     target="$stage/$path"
     mkdir -p "$(dirname "$target")"
+    filemode="$(git ls-tree HEAD -- "$path" | awk '{print $1}')"
+    if [[ "$filemode" == "120000" ]]; then
+      # Symlinks are materialized as real downloadable files below.
+      continue
+    fi
     git show "HEAD:$path" > "$target"
     changed=$((changed + 1))
   done < "$changed_files"
+
+  # SFTP hosts may not permit symlinks. Publish link aliases as real files
+  # (e.g. pacman's openrtmp.db.sig -> openrtmp.db.tar.gz.sig). Re-publish
+  # aliases whenever the target changes, even if the link blob did not.
+  while IFS= read -r -d '' record; do
+    metadata="${record%%
+  if (( changed > 0 )); then
+    echo "Publishing $changed changed $mode files, not the full repository."
+    # Delta files are always transferred even when size/mtime match.
+    # Historical package files are retained rather than pruned.
+    remote_command "mkdir -p \"$remote\"; mirror -R --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
+  else
+    echo "No new or modified $mode packages."
+  fi
+fi
+
+# Advance the state marker only after a complete successful upload.
+printf '%s\n' "$current" > "$RUNNER_TEMP/openrtmp-current.sha"
+remote_command "mkdir -p \"$state_dir\"; put \"$RUNNER_TEMP/openrtmp-current.sha\" -o \"$state_file\""
+echo "$mode is synced to $current."
+\t'*}"
+    path="${record#*
+  if (( changed > 0 )); then
+    echo "Publishing $changed changed $mode files, not the full repository."
+    # Delta files are always transferred even when size/mtime match.
+    # Historical package files are retained rather than pruned.
+    remote_command "mkdir -p \"$remote\"; mirror -R --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
+  else
+    echo "No new or modified $mode packages."
+  fi
+fi
+
+# Advance the state marker only after a complete successful upload.
+printf '%s\n' "$current" > "$RUNNER_TEMP/openrtmp-current.sha"
+remote_command "mkdir -p \"$state_dir\"; put \"$RUNNER_TEMP/openrtmp-current.sha\" -o \"$state_file\""
+echo "$mode is synced to $current."
+\t'}"
+    filemode="${metadata%% *}"
+    [[ "$filemode" == "120000" ]] || continue
+    link_target="$(git show "HEAD:$path")"
+    if [[ -z "$link_target" || "$link_target" == */* || "$link_target" == "." || "$link_target" == ".." ]]; then
+      echo "Unsupported package symlink target in $path" >&2
+      exit 1
+    fi
+    target="$stage/$path"
+    mkdir -p "$(dirname "$target")"
+    git show "HEAD:${path%/*}/$link_target" > "$target"
+    changed=$((changed + 1))
+  done < <(git ls-tree -r -z HEAD -- "$mode")
 
   if (( changed > 0 )); then
     echo "Publishing $changed changed $mode files, not the full repository."
