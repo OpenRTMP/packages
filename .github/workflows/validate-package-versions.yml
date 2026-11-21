@@ -81,7 +81,7 @@ jobs:
             ' .github/workflows/build-librtmp2-packages.yml
           }
           normalized_if() {
-            sed -E 's/^[[:space:]]*if:[[:space:]]*//; s/\r$//'
+            sed -E 's/^[[:space:]]*if:[[:space:]]*//; s/[[:space:]]+#.*$//; s/\r$//'
           }
           for step in \
             "Generate APT metadata" \
