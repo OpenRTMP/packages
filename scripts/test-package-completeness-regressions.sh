@@ -63,6 +63,52 @@ touch "$apt_pool/librtmp2_${VERSION}-1+trixie1_amd64.deb"
 touch "$apt_pool/librtmp2-dev_${VERSION}-1+trixie1_amd64.deb"
 expect_pass bash "$APT_CHECK" apt
 
+# Alpine: runtime, dev, and static must share one pkgrel. dev and static pin
+# the runtime with an exact pkgver-pkgrel dependency.
+for branch in v3.21 v3.22 v3.23 v3.24 edge; do
+    for arch in x86_64 x86 aarch64 armv7 ppc64le riscv64 s390x; do
+        alpine_base="$TEMP_DIR/alpine/$branch/main/$arch"
+        mkdir -p "$alpine_base"
+        touch "$alpine_base/librtmp2-${VERSION}-r0.apk" \
+              "$alpine_base/librtmp2-dev-${VERSION}-r0.apk" \
+              "$alpine_base/librtmp2-static-${VERSION}-r0.apk" \
+              "$alpine_base/APKINDEX.tar.gz"
+    done
+done
+expect_pass bash "$APT_CHECK" alpine
+
+alpine_base="$TEMP_DIR/alpine/edge/main/s390x"
+rm "$alpine_base/librtmp2-dev-${VERSION}-r0.apk"
+touch "$alpine_base/librtmp2-dev-${VERSION}-r1.apk"
+expect_fail bash "$APT_CHECK" alpine
+
+touch "$alpine_base/librtmp2-${VERSION}-r1.apk" \
+      "$alpine_base/librtmp2-static-${VERSION}-r1.apk"
+expect_pass bash "$APT_CHECK" alpine
+
+# RPM: librtmp2-devel requires the exact runtime version-release. A runtime
+# and devel from different releases are not an installable pair.
+for target in fedora:44:fc44 el:9:el9 el:10:el10 opensuse:16.0:suse160; do
+    IFS=: read -r family release release_tag <<< "$target"
+    for arch in x86_64 aarch64 ppc64le s390x; do
+        rpm_base="$TEMP_DIR/rpm/$family/$release/$arch"
+        mkdir -p "$rpm_base/repodata"
+        touch "$rpm_base/librtmp2-${VERSION}-1.${release_tag}.${arch}.rpm" \
+              "$rpm_base/librtmp2-devel-${VERSION}-1.${release_tag}.${arch}.rpm" \
+              "$rpm_base/repodata/repomd.xml" \
+              "$rpm_base/repodata/repomd.xml.asc"
+    done
+done
+expect_pass bash "$OTHER_CHECK" rpm
+
+rpm_base="$TEMP_DIR/rpm/opensuse/16.0/s390x"
+rm "$rpm_base/librtmp2-devel-${VERSION}-1.suse160.s390x.rpm"
+touch "$rpm_base/librtmp2-devel-${VERSION}-2.suse160.s390x.rpm"
+expect_fail bash "$OTHER_CHECK" rpm
+
+touch "$rpm_base/librtmp2-${VERSION}-2.suse160.s390x.rpm"
+expect_pass bash "$OTHER_CHECK" rpm
+
 arch_repo="$TEMP_DIR/arch/x86_64"
 mkdir -p "$arch_repo"
 for name in openrtmp.db openrtmp.db.sig openrtmp.db.tar.gz \

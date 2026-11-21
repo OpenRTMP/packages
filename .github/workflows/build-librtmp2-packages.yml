@@ -143,7 +143,11 @@ jobs:
   publish:
     name: Update Debian and Ubuntu repositories
     needs: build
-    if: needs.build.result == 'success'
+    # Publish the architectures that built successfully even if one matrix leg
+    # fails. The repository-completeness checker still requires every target,
+    # so a partial run never marks the release complete; it only stops one
+    # flaky emulated leg from discarding every other architecture's packages.
+    if: always() && needs.build.result != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -159,6 +163,7 @@ jobs:
 
       - name: Download successful package artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        continue-on-error: true
         with:
           pattern: librtmp2-*
           path: downloaded-packages

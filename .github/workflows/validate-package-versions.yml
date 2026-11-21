@@ -56,6 +56,18 @@ jobs:
           grep -Fq 'pkgrel=$PKGREL' scripts/build-librtmp2-apk.sh
           grep -Fq 'pkgrel=@PKGREL@' scripts/build-librtmp2-arch.sh
 
+      - name: Check APT publish gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One failed emulated leg must not discard every other
+          # architecture's packages; completeness is enforced by the
+          # repository checker, not by the matrix result.
+          grep -Fq "if: always() && needs.build.result != 'cancelled'" \
+            .github/workflows/build-librtmp2-packages.yml
+          grep -Fq "continue-on-error: true" \
+            .github/workflows/build-librtmp2-packages.yml
+
       - name: Verify Debian package upgrade ordering
         shell: bash
         run: |
