@@ -1,0 +1,91 @@
+name: Publish OpenRTMP packages and website to SFTP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      full_sync:
+        description: "Re-upload every package (for host migration/recovery)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages-sftp-deploy
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/validate-web.yml
+
+  packages:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        target: [debian, ubuntu, alpine, rpm, arch, windows, homebrew]
+    steps:
+      - name: Checkout Git metadata and deployment script (no package blobs)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: scripts
+
+      - name: Install SFTP transfer client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lftp
+
+      - name: Sync native package files
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST || 'vweb03.eu' }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_REMOTE_PATH: ${{ secrets.DEPLOY_REMOTE_PATH }}
+          FORCE_FULL_SYNC: ${{ inputs.full_sync }}
+        run: bash scripts/deploy-packages-sftp.sh "${{ matrix.target }}"
+
+  website:
+    needs: packages
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout website sources and Git metadata
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            scripts
+            site
+
+      - name: Install SFTP transfer client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lftp
+
+      - name: Generate and deploy package browser
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST || 'vweb03.eu' }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_USERNAME: ${{ secrets.DEPLOY_USERNAME }}
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_REMOTE_PATH: ${{ secrets.DEPLOY_REMOTE_PATH }}
+        run: bash scripts/deploy-packages-sftp.sh site
+
+      - name: Show public website address
+        run: echo "Published content intended for https://packages.openrtmp.org/"
