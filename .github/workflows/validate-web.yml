@@ -1,0 +1,53 @@
+name: Validate package website and SFTP publisher
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout lightweight website sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          filter: blob:none
+          sparse-checkout: |
+            scripts
+            site
+
+      - name: Lint deployment shell
+        run: |
+          bash -n scripts/deploy-packages-sftp.sh
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck scripts/deploy-packages-sftp.sh
+          fi
+
+      - name: Compile Python generator
+        run: python3 -m py_compile scripts/generate-package-site.py
+
+      - name: Generate site and verify public assets
+        run: |
+          python3 scripts/generate-package-site.py --output "$RUNNER_TEMP/generated"
+          test -s "$RUNNER_TEMP/generated/index.html"
+          test -s "$RUNNER_TEMP/generated/assets/site.css"
+          test -s "$RUNNER_TEMP/generated/assets/site.js"
+          test -s "$RUNNER_TEMP/generated/openrtmp.asc"
+          test -s "$RUNNER_TEMP/generated/openrtmp.gpg"
+          test -s "$RUNNER_TEMP/generated/openrtmp-alpine.rsa.pub"
+          test -s "$RUNNER_TEMP/generated/ubuntu/dists/index.html"
+          test -s "$RUNNER_TEMP/generated/debian/dists/index.html"
+          test -s "$RUNNER_TEMP/generated/alpine/index.html"
+          test -s "$RUNNER_TEMP/generated/rpm/index.html"
+          test -s "$RUNNER_TEMP/generated/arch/index.html"
+          test -s "$RUNNER_TEMP/generated/windows/index.html"
+          test -s "$RUNNER_TEMP/generated/homebrew/index.html"
+          if grep -R -Fq 'href="undefined"' "$RUNNER_TEMP/generated"; then
+            echo "Generated an invalid link." >&2
+            exit 1
+          fi
