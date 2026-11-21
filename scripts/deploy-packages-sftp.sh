@@ -118,38 +118,8 @@ else
   # (e.g. pacman's openrtmp.db.sig -> openrtmp.db.tar.gz.sig). Re-publish
   # aliases whenever the target changes, even if the link blob did not.
   while IFS= read -r -d '' record; do
-    metadata="${record%%
-  if (( changed > 0 )); then
-    echo "Publishing $changed changed $mode files, not the full repository."
-    # Delta files are always transferred even when size/mtime match.
-    # Historical package files are retained rather than pruned.
-    remote_command "mkdir -p \"$remote\"; mirror -R --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
-  else
-    echo "No new or modified $mode packages."
-  fi
-fi
-
-# Advance the state marker only after a complete successful upload.
-printf '%s\n' "$current" > "$RUNNER_TEMP/openrtmp-current.sha"
-remote_command "mkdir -p \"$state_dir\"; put \"$RUNNER_TEMP/openrtmp-current.sha\" -o \"$state_file\""
-echo "$mode is synced to $current."
-\t'*}"
-    path="${record#*
-  if (( changed > 0 )); then
-    echo "Publishing $changed changed $mode files, not the full repository."
-    # Delta files are always transferred even when size/mtime match.
-    # Historical package files are retained rather than pruned.
-    remote_command "mkdir -p \"$remote\"; mirror -R --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
-  else
-    echo "No new or modified $mode packages."
-  fi
-fi
-
-# Advance the state marker only after a complete successful upload.
-printf '%s\n' "$current" > "$RUNNER_TEMP/openrtmp-current.sha"
-remote_command "mkdir -p \"$state_dir\"; put \"$RUNNER_TEMP/openrtmp-current.sha\" -o \"$state_file\""
-echo "$mode is synced to $current."
-\t'}"
+    metadata="${record%%$'\t'*}"
+    path="${record#*$'\t'}"
     filemode="${metadata%% *}"
     [[ "$filemode" == "120000" ]] || continue
     link_target="$(git show "HEAD:$path")"
