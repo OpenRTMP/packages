@@ -84,6 +84,23 @@ Description: RTMP and RTMPS protocol library
  shared library and stable C-compatible FFI.
 
 Package: librtmp2
+Version: 0.17.2-1~bookworm1
+Architecture: arm64
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 4.2), libssl3 (>= 3.0.0)
+Filename: pool/main/l/librtmp2/librtmp2_0.17.2-1~bookworm1_arm64.deb
+Size: 338168
+MD5sum: b2897c21befa1053ec95ac44305c3904
+SHA1: 32939cc669192aac88eb96f0a16eb7ca9e0f0090
+SHA256: 7b61252a010181ef5ffba89999ae21df80e17d89c956f190d601b839c6d5c21f
+Section: libs
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: RTMP and RTMPS protocol library
+ librtmp2 provides Legacy RTMP and Enhanced RTMP support through a native
+ shared library and stable C-compatible FFI.
+
+Package: librtmp2
 Version: 0.7.0-1+bookworm1
 Architecture: arm64
 Maintainer: OpenRTMP <info@openrtmp.org>
@@ -212,6 +229,23 @@ Size: 4389292
 MD5sum: 951a8fe9aa812cd9fb0872fc05145c38
 SHA1: 27883b0e777179986b44e7d1c5c3b0db95004d38
 SHA256: 18b7b9c4fa928b97944888a6a28cc3f522d22ff5a74ac52e5231344b415eac30
+Section: libdevel
+Priority: optional
+Homepage: https://github.com/OpenRTMP/librtmp2
+Description: Development files for librtmp2
+ This package contains the C header, static library, and pkg-config metadata
+ required to build software against librtmp2.
+
+Package: librtmp2-dev
+Version: 0.17.2-1~bookworm1
+Architecture: arm64
+Maintainer: OpenRTMP <info@openrtmp.org>
+Depends: librtmp2 (= 0.17.2-1~bookworm1)
+Filename: pool/main/l/librtmp2/librtmp2-dev_0.17.2-1~bookworm1_arm64.deb
+Size: 4390204
+MD5sum: b229db412b8ef3539d6605b11a5e43aa
+SHA1: df4e0003956c9f29f5f548515bce185034ef7a67
+SHA256: 953d2fa9bb437bce53f928f35aa30824be0c5d7812607aa564a8c84c22991d5a
 Section: libdevel
 Priority: optional
 Homepage: https://github.com/OpenRTMP/librtmp2
