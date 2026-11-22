@@ -76,3 +76,7 @@ jobs:
             echo "Generated an invalid link." >&2
             exit 1
           fi
+          if grep -R -Fq '.gitkeep' "$RUNNER_TEMP/generated"; then
+            echo "Generated a link to a repository placeholder." >&2
+            exit 1
+          fi

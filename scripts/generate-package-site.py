@@ -60,6 +60,8 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
     for name, (is_directory, size) in sorted(
         entries.items(), key=lambda item: (not item[1][0], item[0].casefold())
     ):
+        if name.startswith("."):
+            continue  # Repository placeholders such as .gitkeep are not published.
         href = quote(name, safe="") + ("/" if is_directory else "")
         label = escape(name + ("/" if is_directory else ""))
         icon = "▣" if is_directory else "↧"
