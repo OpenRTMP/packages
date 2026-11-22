@@ -57,6 +57,7 @@ jobs:
         run: |
           python3 scripts/generate-package-site.py --output "$RUNNER_TEMP/generated"
           test -s "$RUNNER_TEMP/generated/index.html"
+          test -s "$RUNNER_TEMP/generated/.htaccess"
           test -s "$RUNNER_TEMP/generated/assets/site.css"
           test -s "$RUNNER_TEMP/generated/assets/site.js"
           test -s "$RUNNER_TEMP/generated/openrtmp.asc"
