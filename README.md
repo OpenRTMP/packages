@@ -53,8 +53,13 @@ Supported architectures include `amd64`, `arm64`, `armhf`, `i386`, `ppc64el`,
 container image.
 
 ```bash
-echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp.org/debian bookworm main" \
-  | sudo tee /etc/apt/sources.list.d/openrtmp.list
+sudo tee /etc/apt/sources.list.d/openrtmp.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://packages.openrtmp.org/debian
+Suites: bookworm
+Components: main
+Signed-By: /usr/share/keyrings/openrtmp.gpg
+EOF
 ```
 
 ## Ubuntu repository
@@ -70,8 +75,13 @@ Supported architectures are `amd64`, `arm64`, `armhf`, `ppc64el`, `riscv64`,
 and `s390x`.
 
 ```bash
-echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp.org/ubuntu noble main" \
-  | sudo tee /etc/apt/sources.list.d/openrtmp.list
+sudo tee /etc/apt/sources.list.d/openrtmp.sources >/dev/null <<'EOF'
+Types: deb
+URIs: https://packages.openrtmp.org/ubuntu
+Suites: noble
+Components: main
+Signed-By: /usr/share/keyrings/openrtmp.gpg
+EOF
 ```
 
 Install the common APT signing key first:

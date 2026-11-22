@@ -90,16 +90,7 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
   <header class="site-header">
     <div class="container header-inner">
       <a href="{up}" class="brand" aria-label="OpenRTMP packages home">
-        <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-          <defs><linearGradient id="brand-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0" stop-color="#60a5fa"/><stop offset="100%" stop-color="#22d3ee"/>
-          </linearGradient></defs>
-          <circle cx="50" cy="50" r="38" fill="none" stroke="url(#brand-gradient)" stroke-width="10"
-                  stroke-dasharray="205 35" stroke-dashoffset="-92" stroke-linecap="round"/>
-          <polyline points="20,52 30,52 36,38 44,64 50,52 58,52" fill="none"
-                    stroke="url(#brand-gradient)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M58 40 L78 52 L58 64 Z" fill="url(#brand-gradient)"/>
-        </svg>
+        <img class="brand-mark" src="{up}assets/favicon.svg" width="28" height="28" alt="">
         <span>OpenRTMP<span class="brand-sub"> / packages</span></span>
       </a>
       <nav class="site-nav" aria-label="Main navigation">

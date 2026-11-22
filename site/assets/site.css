@@ -59,7 +59,7 @@ code { font-family: var(--mono); }
 .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 68px; }
 .brand { display: flex; align-items: center; gap: 11px; font-size: 15px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
 .brand:hover { color: var(--text); }
-.brand-mark { width: 28px; height: 28px; }
+.brand-mark { width: 28px; height: 28px; flex: none; }
 .brand-sub { color: var(--muted); font-weight: 500; }
 .site-nav { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
 .nav-link { padding: 7px 10px; border-radius: 8px; color: var(--muted-strong); }
