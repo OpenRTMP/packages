@@ -5,6 +5,14 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- The package website has a new layout: a hero with a platform index, tabbed
+  install snippets for every supported ecosystem (each with copy button), and
+  a verification section that states the signing-key fingerprint. The generated
+  directory indexes reuse the same theme, and the platform choice is remembered
+  in `localStorage`. Both still build from plain static files, so the SFTP
+  publisher is unchanged.
+
 ### Fixed
 - The Alpine and RPM completeness checks require the runtime to share one
   revision with its siblings: runtime/development/static for Alpine and

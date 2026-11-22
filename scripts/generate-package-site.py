@@ -77,7 +77,7 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0b1019">
+  <meta name="theme-color" content="#070b12">
   <title>{title} · OpenRTMP Packages</title>
   <meta name="description" content="Browse the official OpenRTMP signed package repository.">
   <link rel="icon" href="{up}assets/favicon.svg" type="image/svg+xml">
@@ -85,21 +85,33 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
   <script defer src="{up}assets/site.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="container nav-inner">
-      <a href="{up}" class="brand"><span class="brand-mark">OR</span>
-        <span>OpenRTMP<span class="brand-muted"> / packages</span></span></a>
-      <nav aria-label="Main navigation">
-        <a href="{up}#install">Installation</a>
-        <a href="{up}#browse">Repositories</a>
-        <a href="https://github.com/OpenRTMP/packages" rel="noopener">GitHub ↗</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="{up}" class="brand" aria-label="OpenRTMP packages home">
+        <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+          <defs><linearGradient id="brand-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0" stop-color="#60a5fa"/><stop offset="100%" stop-color="#22d3ee"/>
+          </linearGradient></defs>
+          <circle cx="50" cy="50" r="38" fill="none" stroke="url(#brand-gradient)" stroke-width="10"
+                  stroke-dasharray="205 35" stroke-dashoffset="-92" stroke-linecap="round"/>
+          <polyline points="20,52 30,52 36,38 44,64 50,52 58,52" fill="none"
+                    stroke="url(#brand-gradient)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M58 40 L78 52 L58 64 Z" fill="url(#brand-gradient)"/>
+        </svg>
+        <span>OpenRTMP<span class="brand-sub"> / packages</span></span>
+      </a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a class="nav-link" href="{up}#install">Installation</a>
+        <a class="nav-link" href="{up}#repositories">Repositories</a>
+        <a class="nav-link" href="{up}#verify">Verify</a>
+        <a class="nav-cta" href="https://github.com/OpenRTMP/packages" rel="noopener">GitHub ↗</a>
       </nav>
     </div>
   </header>
   <main class="container browse-page">
     <nav class="breadcrumb" aria-label="Breadcrumb">{breadcrumb_markup}</nav>
     <div class="heading-row">
-      <div><div class="eyebrow">PACKAGE DIRECTORY</div>
+      <div><div class="eyebrow">Package directory</div>
         <h1>{title}</h1>
         <p class="subtitle">Signed package files and repository metadata, served directly over HTTPS.</p>
       </div>
@@ -119,9 +131,13 @@ def build_index(directory: str, entries: dict[str, tuple[bool, int]]) -> str:
       </div>
     </div>
   </main>
-  <footer class="footer container"><span>© OpenRTMP · MIT License</span>
-    <span><a href="https://openrtmp.org/">Project website</a> ·
-    <a href="https://github.com/OpenRTMP/packages">Source repository</a></span>
+  <footer class="site-footer container">
+    <p>© OpenRTMP · MIT License</p>
+    <div class="footer-links">
+      <a href="https://openrtmp.org/" rel="noopener">openrtmp.org</a>
+      <a href="https://github.com/OpenRTMP/packages" rel="noopener">Source</a>
+      <a href="{up}#install">Installation</a>
+    </div>
   </footer>
 </body>
 </html>
