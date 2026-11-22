@@ -4,5 +4,5 @@
 # (deb, rpm, apk, zip, ...) keep their default caching.
 <IfModule mod_headers.c>
   Header set Cache-Control "no-cache, must-revalidate" "expr=%{CONTENT_TYPE} =~ m#^text/html#"
-  Header set Cache-Control "public, max-age=300" "expr=%{CONTENT_TYPE} =~ m#^(text/css|application/javascript|image/svg\+xml)#"
+  Header set Cache-Control "public, max-age=300" "expr=%{CONTENT_TYPE} =~ m#^(text/css|(text|application)/javascript|image/svg\+xml)#"
 </IfModule>
