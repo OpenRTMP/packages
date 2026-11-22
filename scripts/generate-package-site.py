@@ -157,6 +157,9 @@ def generate(repo: Path, output: Path) -> None:
 
     shutil.copy2(source / "index.html", output / "index.html")
     shutil.copytree(source / "assets", output / "assets")
+    htaccess = source / ".htaccess"
+    if htaccess.is_file():
+        shutil.copy2(htaccess, output / ".htaccess")
 
     for key in PUBLIC_KEYS:
         (output / key).write_bytes(git(repo, "show", f"HEAD:{key}"))
