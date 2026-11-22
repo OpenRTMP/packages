@@ -14,6 +14,10 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   publisher is unchanged.
 
 ### Fixed
+- Repository placeholder files (`.gitkeep`) are no longer published or linked:
+  they are gone from the package trees, the directory indexes skip dotfiles,
+  the SFTP mirror excludes them, and the site publish removes the copies that
+  were already uploaded.
 - The Alpine and RPM completeness checks require the runtime to share one
   revision with its siblings: runtime/development/static for Alpine and
   runtime/development for RPM. The development packages pin the runtime

@@ -57,6 +57,10 @@ remote_command "cd \"$remote\""
 if [[ "$mode" == "site" ]]; then
   python3 scripts/generate-package-site.py --output "$RUNNER_TEMP/package-site"
   echo "Publishing static website and indexes to $DEPLOY_HOST."
+  # Earlier publishes copied repository placeholders (.gitkeep) into the
+  # webroot. They are excluded from new transfers; drop the already published
+  # copies so no empty placeholder is reachable over HTTPS.
+  remote_command "rm -f \"$remote/debian/dists/.gitkeep\" \"$remote/debian/pool/main/l/librtmp2/.gitkeep\" \"$remote/ubuntu/dists/.gitkeep\" \"$remote/ubuntu/pool/main/l/librtmp2/.gitkeep\""
   remote_command "mirror -R --overwrite --no-perms --transfer-all --parallel=3 \"$RUNNER_TEMP/package-site\" \"$remote\""
   exit 0
 fi
@@ -101,7 +105,7 @@ if [[ -z "$previous" ]]; then
   # the complete multi-GB repository or all of its history.
   git sparse-checkout set "$mode" scripts
   echo "Initial full sync of $mode."
-  remote_command "mirror -RL --overwrite --transfer-all --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
+  remote_command "mirror -RL --exclude-glob .gitkeep --overwrite --transfer-all --no-perms --parallel=2 \"$mode\" \"$remote/$mode\""
 elif [[ "$previous" == "$current" ]]; then
   echo "$mode already at the current commit; no files to transfer."
 else
@@ -147,7 +151,7 @@ else
     echo "Publishing $changed changed $mode files, not the full repository."
     # Delta files are always transferred even when size/mtime match.
     # Historical package files are retained rather than pruned.
-    remote_command "mirror -R --overwrite --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
+    remote_command "mirror -R --exclude-glob .gitkeep --overwrite --transfer-all --no-perms --parallel=2 \"$stage/$mode\" \"$remote/$mode\""
   else
     echo "No new or modified $mode packages."
   fi
