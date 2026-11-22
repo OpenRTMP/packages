@@ -12,6 +12,9 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   directory indexes reuse the same theme, and the platform choice is remembered
   in `localStorage`. Both still build from plain static files, so the SFTP
   publisher is unchanged.
+- APT setup uses the deb822 `.sources` format (default since Ubuntu 24.04)
+  instead of one-line `.list` files, and the site serves the same
+  `favicon.svg` as openrtmp.org.
 - The website ships an `.htaccess` cache policy: HTML is revalidated on every
   request, CSS/JS/SVG may be reused for five minutes, and package files keep
   their default caching.

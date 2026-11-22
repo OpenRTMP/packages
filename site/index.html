@@ -18,19 +18,7 @@
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/" aria-label="OpenRTMP packages home">
-        <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="brand-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0" stop-color="#60a5fa"/>
-              <stop offset="100%" stop-color="#22d3ee"/>
-            </linearGradient>
-          </defs>
-          <circle cx="50" cy="50" r="38" fill="none" stroke="url(#brand-gradient)" stroke-width="10"
-                  stroke-dasharray="205 35" stroke-dashoffset="-92" stroke-linecap="round"/>
-          <polyline points="20,52 30,52 36,38 44,64 50,52 58,52" fill="none"
-                    stroke="url(#brand-gradient)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M58 40 L78 52 L58 64 Z" fill="url(#brand-gradient)"/>
-        </svg>
+        <img class="brand-mark" src="assets/favicon.svg" width="28" height="28" alt="">
         <span>OpenRTMP<span class="brand-sub"> / packages</span></span>
       </a>
       <nav class="site-nav" aria-label="Main navigation">
@@ -113,12 +101,17 @@
 <pre id="cmd-debian"><code>curl -fsSL https://packages.openrtmp.org/openrtmp.gpg \
   | sudo tee /usr/share/keyrings/openrtmp.gpg &gt;/dev/null
 
-echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp.org/debian trixie main" \
-  | sudo tee /etc/apt/sources.list.d/openrtmp.list
+sudo tee /etc/apt/sources.list.d/openrtmp.sources &gt;/dev/null &lt;&lt;'EOF'
+Types: deb
+URIs: https://packages.openrtmp.org/debian
+Suites: trixie
+Components: main
+Signed-By: /usr/share/keyrings/openrtmp.gpg
+EOF
 
 sudo apt update
 sudo apt install librtmp2 librtmp2-dev</code></pre>
-            <p class="terminal-note">Debian 13 uses <code>trixie</code>, Debian 12 uses <code>bookworm</code>. <a href="https://github.com/OpenRTMP/packages#debian-repository">Repository details ↗</a></p>
+            <p class="terminal-note">Debian 13 uses <code>trixie</code>, Debian 12 uses <code>bookworm</code>. Older releases that do not read <code>.sources</code> files can use one-line <code>deb</code> syntax instead. <a href="https://github.com/OpenRTMP/packages#debian-repository">Repository details ↗</a></p>
           </figure>
         </div>
 
@@ -132,12 +125,17 @@ sudo apt install librtmp2 librtmp2-dev</code></pre>
 <pre id="cmd-ubuntu"><code>curl -fsSL https://packages.openrtmp.org/openrtmp.gpg \
   | sudo tee /usr/share/keyrings/openrtmp.gpg &gt;/dev/null
 
-echo "deb [signed-by=/usr/share/keyrings/openrtmp.gpg] https://packages.openrtmp.org/ubuntu resolute main" \
-  | sudo tee /etc/apt/sources.list.d/openrtmp.list
+sudo tee /etc/apt/sources.list.d/openrtmp.sources &gt;/dev/null &lt;&lt;'EOF'
+Types: deb
+URIs: https://packages.openrtmp.org/ubuntu
+Suites: resolute
+Components: main
+Signed-By: /usr/share/keyrings/openrtmp.gpg
+EOF
 
 sudo apt update
 sudo apt install librtmp2 librtmp2-dev</code></pre>
-            <p class="terminal-note">Supported: <code>jammy</code> 22.04, <code>noble</code> 24.04, <code>resolute</code> 26.04, <code>stonking</code> 26.10. <a href="https://github.com/OpenRTMP/packages#ubuntu-repository">Repository details ↗</a></p>
+            <p class="terminal-note">Supported: <code>jammy</code> 22.04, <code>noble</code> 24.04, <code>resolute</code> 26.04, <code>stonking</code> 26.10. <code>.sources</code> is the deb822 format that Ubuntu uses by default since 24.04. <a href="https://github.com/OpenRTMP/packages#ubuntu-repository">Repository details ↗</a></p>
           </figure>
         </div>
 
