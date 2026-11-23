@@ -88,6 +88,26 @@ jobs:
           [[ -n "${RAW_VERSION:-}" ]] || { echo "No librtmp2 version supplied." >&2; exit 1; }
           echo "version=${RAW_VERSION#v}" >> "$GITHUB_OUTPUT"
 
+      # Docker 29.4.2 (ubuntu-26.04 runner image) ships moby seccomp/v0.2.2,
+      # whose default profile returns ENOSYS for socketcall(2). Debian's i386
+      # glibc routes every socket call through that multiplexer, so an i386
+      # container has no network and apt-get fails with "Temporary failure
+      # resolving". seccomp/v0.2.3 (Docker 29.4.3+) reverts the deny; use that
+      # profile, pinned by hash, until the runner image catches up.
+      # See actions/runner-images#14790 and HDFGroup/hdf5#6831.
+      - name: Fetch the i386 seccomp profile
+        if: matrix.architecture == 'i386'
+        shell: bash
+        run: |
+          set -euo pipefail
+          profile="$RUNNER_TEMP/seccomp-i386.json"
+          curl -fsSL --proto '=https' --tlsv1.2 \
+            https://raw.githubusercontent.com/moby/profiles/seccomp/v0.2.3/seccomp/default.json \
+            -o "$profile"
+          printf '%s  %s\n' \
+            '536529b665dd0972c37bfb569f5d4ac8a53592e7b00752bc39ff063ca9864c74' "$profile" \
+            | sha256sum -c -
+
       - name: Build packages
         shell: bash
         env:
@@ -99,7 +119,11 @@ jobs:
         run: |
           [[ "$DEB_REVISION" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid Debian revision: $DEB_REVISION" >&2; exit 1; }
           mkdir -p output
-          docker run --rm --platform "$PLATFORM" \
+          docker_args=(--rm --platform "$PLATFORM")
+          if [[ "$EXPECTED_ARCHITECTURE" == "i386" ]]; then
+            docker_args+=(--security-opt "seccomp=$RUNNER_TEMP/seccomp-i386.json")
+          fi
+          docker run "${docker_args[@]}" \
             -e VERSION -e DEB_REVISION -e CODENAME -e EXPECTED_ARCHITECTURE \
             -e SOURCE_DIR=/workspace/librtmp2 -e OUTPUT_DIR=/workspace/output \
             -v "$GITHUB_WORKSPACE:/workspace" -w /workspace "$IMAGE" \
