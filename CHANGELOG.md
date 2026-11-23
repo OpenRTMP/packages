@@ -36,3 +36,8 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   rewriting metadata or advancing `main`.
 - The package-version validation checks each APT publish step's own no-op gate
   instead of matching the condition anywhere in the workflow.
+- The Debian i386 APT build runs its container with moby's pinned
+  seccomp/v0.2.3 profile, which allows `socketcall(2)`. Docker 29.4.2 on the
+  ubuntu-26.04 runner image denied that syscall, so Debian i386 glibc had no
+  network and the job failed before compiling; other architectures use direct
+  socket syscalls and were unaffected.

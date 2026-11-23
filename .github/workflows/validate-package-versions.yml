@@ -95,6 +95,20 @@ jobs:
           deploy_guard="$(step_if "Deploy updated repository to SFTP" | normalized_if)"
           [[ "$deploy_guard" == "steps.packages.outputs.available == 'true'" ]]
 
+      - name: Check the i386 seccomp workaround
+        shell: bash
+        run: |
+          set -euo pipefail
+          workflow=.github/workflows/build-librtmp2-packages.yml
+          # Debian i386 glibc uses socketcall(2), which the Docker 29.4.2
+          # default profile denies on ubuntu-26.04 runners. Keep the pinned
+          # seccomp/v0.2.3 profile wired to the i386 container until the
+          # runner image ships Docker 29.4.3+.
+          grep -Fq 'moby/profiles/seccomp/v0.2.3/seccomp/default.json' "$workflow"
+          grep -Fq '536529b665dd0972c37bfb569f5d4ac8a53592e7b00752bc39ff063ca9864c74' "$workflow"
+          grep -Fq "if: matrix.architecture == 'i386'" "$workflow"
+          grep -Fq 'seccomp=$RUNNER_TEMP/seccomp-i386.json' "$workflow"
+
       - name: Verify Debian package upgrade ordering
         shell: bash
         run: |
